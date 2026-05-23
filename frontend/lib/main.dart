@@ -3,7 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:record/record.dart';
+import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
 
@@ -21,8 +21,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
   Interpreter? _melspecModel;
   Interpreter? _embedding;
   Interpreter? _classifier;
-  final _audioRecorder = AudioRecorder();
-  StreamSubscription<List<int>>? _audioStream;
+  StreamSubscription<AudioDataContainer>? _audioStream;
 
   String _status = "⏳ Cargando modelo...";
   bool _listening = false;
@@ -89,19 +88,24 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
       _melBuffer.clear();
       _featureBuffer.clear();
       _recentScores.clear();
-      final stream = await _audioRecorder.startStream(const RecordConfig(
-        encoder: AudioEncoder.pcm16bits,
+      await Recorder.instance.init(
+        format: PCMFormat.s16le,
         sampleRate: _sampleRate,
-        numChannels: 1,
-      ));
-      _audioStream = stream.listen(_processAudio);
+        channels: RecorderChannels.mono,
+      );
+      Recorder.instance.start();
+      Recorder.instance.startStreamingData();
+      _audioStream = Recorder.instance.uint8ListStream.listen((data) {
+        _processAudio(data.rawData);
+      });
       setState(() {
         _listening = true;
         _status = "🎙️ Escuchando... di 'hey jarvis'";
         _jarvisDetected = false;
       });
     } else {
-      await _audioRecorder.stop();
+      Recorder.instance.stopStreamingData();
+      Recorder.instance.stop();
       await _audioStream?.cancel();
       setState(() {
         _listening = false;
@@ -203,7 +207,9 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
 
   @override
   void dispose() {
-    _audioRecorder.stop();
+    Recorder.instance.stopStreamingData();
+    Recorder.instance.stop();
+    Recorder.instance.deinit();
     _audioStream?.cancel();
     _melspecModel?.close();
     _embedding?.close();

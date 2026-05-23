@@ -1,5 +1,5 @@
 name: jarvis
-description: openWakeWord hey jarvis offline con TFLite
+description: WakeWord hey jarvis offline con TFLite
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -10,7 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   tflite_flutter: ^0.12.1
-  record: ^6.2.0
+  flutter_recorder: ^1.1.5
   permission_handler: ^11.3.1
 
 flutter:

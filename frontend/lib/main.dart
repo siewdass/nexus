@@ -18,7 +18,8 @@ Future<void> main() async {
 
   const android = AndroidInitializationSettings('@mipmap/ic_launcher');
   const ios = DarwinInitializationSettings();
-  await _notif.initialize(const InitializationSettings(android: android, iOS: ios));
+  await _notif
+      .initialize(const InitializationSettings(android: android, iOS: ios));
 
   final channel = AndroidNotificationChannel(
     'jarvis_detected',
@@ -27,8 +28,9 @@ Future<void> main() async {
     importance: Importance.high,
     playSound: true,
   );
-  await _notif.resolvePlatformSpecificImplementation<
-      AndroidFlutterLocalNotificationsPlugin>()
+  await _notif
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
   runApp(const MaterialApp(home: OpenWakeWordDemo()));
@@ -50,20 +52,11 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
   bool _listening = false;
   bool _jarvisDetected = false;
   bool _modelReady = false;
+  bool _isStarting = false;
 
   DateTime? _lastTrigger;
-  double _currentScore = 0;
-  double _currentRaw = 0;
-  double _audioLevel = 0;
-  double _melMin = 0;
-  double _melMax = 0;
-  double _embMin = 0;
-  double _embMax = 0;
-  int _debugMelFrames = 0;
-  double _inputMin = 0;
-  double _inputMax = 0;
   static const _debounceMs = 3000;
-  static const _threshold = 0.55;
+  static const _threshold = 0.51;
   static const _frameSize = 1280;
   static const _sampleRate = 16000;
   static const _melBins = 32;
@@ -73,7 +66,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
   static const _slidingWindowAvg = 10;
   static const _maxMelBuffer = 760;
   static const _maxFeatureBuffer = 120;
-  static const _warmupFrames = 5;
+  static const _warmupFrames = 0;
 
   final List<double> _audioBuffer = [];
   final List<Float32List> _melBuffer = [];
@@ -82,10 +75,10 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
   int _predictionCount = 0;
   bool _processingAudio = false;
   final List<double> _melInputBuf = List.filled(1280, 0.0);
-  final _embOutput = List.generate(1, (_) =>
-      List.generate(1, (_) =>
-          List.generate(1, (_) =>
-              List.filled(96, 0.0))));
+  final _embOutput = List.generate(
+      1,
+      (_) => List.generate(
+          1, (_) => List.generate(1, (_) => List.filled(96, 0.0))));
 
   @override
   void initState() {
@@ -99,26 +92,30 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
 
       final b1 = await rootBundle.load('assets/models/melspectrogram.tflite');
       final opts = InterpreterOptions()..addDelegate(XNNPackDelegate());
-      _melspecModel = Interpreter.fromBuffer(b1.buffer.asUint8List(), options: opts);
+      _melspecModel =
+          Interpreter.fromBuffer(b1.buffer.asUint8List(), options: opts);
       _melspecModel!.resizeInputTensor(0, [1, 1280]);
       _melspecModel!.allocateTensors();
 
       // Inspect all tensor shapes
       final melOut = _melspecModel!.getOutputTensor(0);
       final melIn = _melspecModel!.getInputTensor(0);
-      debugPrint('Mel: in=${melIn.shape} type=${melIn.type} out=${melOut.shape} type=${melOut.type} dataLen=${melOut.data.length}');
+      debugPrint(
+          'Mel: in=${melIn.shape} type=${melIn.type} out=${melOut.shape} type=${melOut.type} dataLen=${melOut.data.length}');
 
       final b2 = await rootBundle.load('assets/models/embedding_model.tflite');
       _embedding = Interpreter.fromBuffer(b2.buffer.asUint8List());
       final embIn = _embedding!.getInputTensor(0);
       final embOut = _embedding!.getOutputTensor(0);
-      debugPrint('Embedding: in=${embIn.shape} type=${embIn.type} out=${embOut.shape} type=${embOut.type}');
+      debugPrint(
+          'Embedding: in=${embIn.shape} type=${embIn.type} out=${embOut.shape} type=${embOut.type}');
 
       final b3 = await rootBundle.load('assets/models/hey_jarvis.tflite');
       _classifier = Interpreter.fromBuffer(b3.buffer.asUint8List());
       final clsIn = _classifier!.getInputTensor(0);
       final clsOut = _classifier!.getOutputTensor(0);
-      debugPrint('Classifier: in=${clsIn.shape} type=${clsIn.type} out=${clsOut.shape} type=${clsOut.type}');
+      debugPrint(
+          'Classifier: in=${clsIn.shape} type=${clsIn.type} out=${clsOut.shape} type=${clsOut.type}');
 
       _modelReady = true;
       setState(() => _status = 'Di hey jarvis');
@@ -139,7 +136,6 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
     await [Permission.notification].request();
 
     if (!_listening) {
-
       _audioBuffer.clear();
       _melBuffer.clear();
       _featureBuffer.clear();
@@ -165,12 +161,9 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
 
       setState(() {
         _listening = true;
-        _status = 'Escuchando...';
+        _isStarting = true;
+        _status = 'Iniciando...';
         _jarvisDetected = false;
-      });
-      Timer.periodic(const Duration(seconds: 3), (t) {
-        if (!_listening || !mounted) { t.cancel(); return; }
-        debugPrint('a=${_audioLevel.toStringAsFixed(2)} i=[${_inputMin.toStringAsFixed(0)},${_inputMax.toStringAsFixed(0)}] f$_debugMelFrames m=[${_melMin.toStringAsFixed(1)},${_melMax.toStringAsFixed(1)}] e=[${_embMin.toStringAsFixed(0)},${_embMax.toStringAsFixed(0)}] r=${_currentRaw.toStringAsFixed(4)} s=${_currentScore.toStringAsFixed(4)}');
       });
     } else {
       _processingAudio = false;
@@ -180,13 +173,15 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
 
       setState(() {
         _listening = false;
+        _isStarting = false;
         _status = 'Pausado';
       });
     }
   }
 
   void _processAudio(Uint8List buffer) {
-    if (_melspecModel == null || _embedding == null || _classifier == null) return;
+    if (_melspecModel == null || _embedding == null || _classifier == null)
+      return;
     if (_processingAudio) return;
 
     final int16Len = buffer.lengthInBytes ~/ 2;
@@ -228,48 +223,32 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
     final n = data.lengthInBytes ~/ 4;
     final result = Float32List(n);
     for (int i = 0; i < n; i++) {
-      result[i] = data.buffer.asByteData(data.offsetInBytes).getFloat32(i * 4, Endian.little);
+      result[i] = data.buffer
+          .asByteData(data.offsetInBytes)
+          .getFloat32(i * 4, Endian.little);
     }
     return result;
   }
 
   void _processChunk(Float32List chunk) {
-    double maxLevel = 0;
-    _inputMin = double.infinity;
-    _inputMax = double.negativeInfinity;
     for (int i = 0; i < _frameSize; i++) {
-      final v = chunk[i] * 10000.0;
-      _melInputBuf[i] = v;
-      if (v < _inputMin) _inputMin = v;
-      if (v > _inputMax) _inputMax = v;
-      final abs = chunk[i] < 0 ? -chunk[i] : chunk[i];
-      if (abs > maxLevel) maxLevel = abs;
+      _melInputBuf[i] = chunk[i] * 10000.0;
     }
-    _audioLevel = maxLevel;
-    _melspecModel!.runInference([[_melInputBuf]]);
+    _melspecModel!.runInference([
+      [_melInputBuf]
+    ]);
 
     // Read ALL mel frames from model output
     final melFloatsAll = _readTensorFloats(_melspecModel!.getOutputTensor(0));
     final numFrames = melFloatsAll.length ~/ _melBins;
-    _debugMelFrames = numFrames;
 
-    // Model writes 6 new frames at the END of the output ring buffer
     // Read the last 6 frames each time for streaming
     final startFrame = max(0, numFrames - 6);
-    _melMin = double.infinity;
-    _melMax = double.negativeInfinity;
     for (int fi = startFrame; fi < numFrames; fi++) {
       final norm = Float32List(_melBins);
       for (int j = 0; j < _melBins; j++) {
         final raw = melFloatsAll[fi * _melBins + j];
-        if (raw.isFinite) {
-          final v = (raw / 10.0) + 2.0;
-          norm[j] = v;
-        } else {
-          norm[j] = 2.0;
-        }
-        if (norm[j] < _melMin) _melMin = norm[j];
-        if (norm[j] > _melMax) _melMax = norm[j];
+        norm[j] = raw.isFinite ? (raw / 10.0) + 2.0 : 2.0;
       }
       _melBuffer.add(norm);
     }
@@ -284,20 +263,15 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
       final last76 = _melBuffer.sublist(_melBuffer.length - _windowSize);
 
       // Embedding expects NHWC: [1, 76, 32, 1] (batch, height, width, channels)
-      final embInput = List.generate(1, (_) =>
-          List.generate(_windowSize, (i) =>
-              List.generate(_melBins, (j) =>
-                  [last76[i][j]])));
+      final embInput = List.generate(
+          1,
+          (_) => List.generate(_windowSize,
+              (i) => List.generate(_melBins, (j) => [last76[i][j]])));
       _embedding!.run(embInput, _embOutput);
 
       final embedding = Float32List(_embedDim);
-      _embMin = double.infinity;
-      _embMax = double.negativeInfinity;
       for (int i = 0; i < _embedDim; i++) {
-        final v = _embOutput[0][0][0][i];
-        embedding[i] = v;
-        if (v < _embMin) _embMin = v;
-        if (v > _embMax) _embMax = v;
+        embedding[i] = _embOutput[0][0][0][i];
       }
       _featureBuffer.add(embedding);
 
@@ -315,19 +289,24 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
     _predictionCount++;
 
     if (_predictionCount <= _warmupFrames) {
-      _currentScore = 0.0;
-      _currentRaw = 0.0;
       return;
     }
 
+    if (_isStarting) {
+      _isStarting = false;
+      setState(() => _status = 'Escuchando...');
+    }
+
     final startIdx = _featureBuffer.length - _nFeatureFrames;
-    final classifierInput = [List.generate(_nFeatureFrames, (i) =>
-        List.generate(_embedDim, (j) => _featureBuffer[startIdx + i][j]))];
+    final classifierInput = [
+      List.generate(
+          _nFeatureFrames,
+          (i) =>
+              List.generate(_embedDim, (j) => _featureBuffer[startIdx + i][j]))
+    ];
     _classifier!.runInference([classifierInput]);
     final rawScore = _readTensorFloats(_classifier!.getOutputTensor(0))[0];
-    _currentRaw = rawScore;
     final score = _sigmoid(rawScore);
-    _currentScore = score;
 
     _recentScores.add(score);
     if (_recentScores.length > _slidingWindowAvg) {
@@ -335,10 +314,12 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
     }
 
     final avg = _recentScores.reduce((a, b) => a + b) / _recentScores.length;
-    if (score >= _threshold || (_recentScores.length >= _slidingWindowAvg && avg >= _threshold)) {
+    if (score >= _threshold ||
+        (_recentScores.length >= _slidingWindowAvg && avg >= _threshold)) {
       final now = DateTime.now();
       if (_lastTrigger == null ||
-          now.difference(_lastTrigger!) > const Duration(milliseconds: _debounceMs)) {
+          now.difference(_lastTrigger!) >
+              const Duration(milliseconds: _debounceMs)) {
         _lastTrigger = now;
         _recentScores.clear();
 
@@ -348,6 +329,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
 
         setState(() {
           _listening = false;
+          _isStarting = false;
           _jarvisDetected = true;
           _status = 'Hey Jarvis! (${avg.toStringAsFixed(2)})';
         });
@@ -358,7 +340,9 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
           'Hey Jarvis!',
           'Wake word detectado (${avg.toStringAsFixed(2)})',
           const NotificationDetails(
-            android: AndroidNotificationDetails('jarvis_detected', 'Jarvis Wake Word',
+            android: AndroidNotificationDetails(
+              'jarvis_detected',
+              'Jarvis Wake Word',
               importance: Importance.high,
               priority: Priority.high,
             ),
@@ -389,9 +373,11 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
         actions: [
           IconButton(
             icon: const Icon(Icons.volume_up),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => const VoiceTestScreen(),
-            )),
+            onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const VoiceTestScreen(),
+                )),
           ),
         ],
       ),
@@ -399,7 +385,8 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(_status,
+            Text(
+              _status,
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -420,10 +407,20 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
               child: FloatingActionButton(
                 onPressed: _toggleListening,
                 backgroundColor: _listening ? Colors.red : Colors.green,
-                child: Icon(
-                  _listening ? Icons.stop : Icons.play_arrow,
-                  size: 48,
-                ),
+                child: _isStarting
+                    ? const SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(
+                        _listening ? Icons.stop : Icons.play_arrow,
+                        size: 48,
+                      ),
               ),
             ),
             const SizedBox(height: 20),

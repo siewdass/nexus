@@ -25,10 +25,11 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
 
   List<Map> get _filteredVoices {
     final q = _filterCtrl.text.toLowerCase();
-    if (q.isEmpty) return _voices;
     return _voices.where((v) {
       final name = (v['name']?.toString() ?? '').toLowerCase();
       final locale = (v['locale']?.toString() ?? '').toLowerCase();
+      if (!name.contains('es-us-x') && !locale.contains('es-us-x')) return false;
+      if (q.isEmpty) return true;
       return name.contains(q) || locale.contains(q);
     }).toList();
   }
@@ -50,14 +51,22 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
 
   Future<void> _initTts() async {
     _defaultEngine = await _tts.getDefaultEngine;
-    final engines = await _tts.getEngines;
-    final voices = await _tts.getVoices;
-    setState(() {
-      _currentEngine = _defaultEngine;
-      _engines = engines.cast<String>();
-      _voices = voices.cast<Map>();
-      _loaded = true;
-    });
+    _engines = (await _tts.getEngines).cast<String>();
+    try {
+      await _tts.setEngine('com.google.android.tts');
+      final voices = await _tts.getVoices;
+      setState(() {
+        _currentEngine = 'com.google.android.tts';
+        _voices = voices.cast<Map>();
+        _loaded = true;
+      });
+    } catch (e) {
+      setState(() {
+        _currentEngine = _defaultEngine;
+        _voices = [];
+        _loaded = true;
+      });
+    }
   }
 
   Future<void> _switchEngine(String engine) async {

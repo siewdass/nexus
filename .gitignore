@@ -60,5 +60,4 @@ frontend/android/local.properties
 frontend/android/gradle/wrapper/gradle-wrapper.jar
 
 # External
-Qwen3.5-0.8b-Q8.gguf
-libllama.dylib
+Qwen3-0.6B-Q8_0.gguf

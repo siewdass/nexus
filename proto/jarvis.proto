@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package jarvis;
+
+service JarvisService {
+  rpc Chat (ChatRequest) returns (stream ChatResponse);
+}
+
+message ChatRequest {
+  string text = 1;
+}
+
+message ChatResponse {
+  string text = 1;
+}

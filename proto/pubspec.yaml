@@ -1,0 +1,9 @@
+name: jarvis_proto
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  protobuf: ^6.0.0
+  grpc: ^5.1.0

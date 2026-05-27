@@ -3,8 +3,8 @@ import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 
 import 'tools.dart';
 
-const String _dylibDir = '../../libllama.dylib';
-const String _modelPath = '../../Qwen3.5-0.8B-Q8.gguf';
+const String _dylibDir = '/Users/siewdass/Desktop/jarvis/libllama.dylib';
+const String _modelPath = '/Users/siewdass/Desktop/jarvis/Qwen3.5-0.8B-Q8.gguf';
 const String _workspace = './workspace';
 
 final _toolParen = RegExp(r'^\[TOOL\]\s*(\w+)\((.*)\)\s*$', multiLine: true);

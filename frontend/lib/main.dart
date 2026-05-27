@@ -81,6 +81,11 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
   final List<double> _recentScores = [];
   int _predictionCount = 0;
   bool _processingAudio = false;
+  final List<double> _melInputBuf = List.filled(1280, 0.0);
+  final _embOutput = List.generate(1, (_) =>
+      List.generate(1, (_) =>
+          List.generate(1, (_) =>
+              List.filled(96, 0.0))));
 
   @override
   void initState() {
@@ -232,16 +237,16 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
     double maxLevel = 0;
     _inputMin = double.infinity;
     _inputMax = double.negativeInfinity;
-    final melInputValues = [List.generate(1280, (i) {
+    for (int i = 0; i < _frameSize; i++) {
       final v = chunk[i] * 10000.0;
+      _melInputBuf[i] = v;
       if (v < _inputMin) _inputMin = v;
       if (v > _inputMax) _inputMax = v;
       final abs = chunk[i] < 0 ? -chunk[i] : chunk[i];
       if (abs > maxLevel) maxLevel = abs;
-      return v;
-    })];
+    }
     _audioLevel = maxLevel;
-    _melspecModel!.runInference([melInputValues]);
+    _melspecModel!.runInference([[_melInputBuf]]);
 
     // Read ALL mel frames from model output
     final melFloatsAll = _readTensorFloats(_melspecModel!.getOutputTensor(0));
@@ -283,18 +288,13 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
           List.generate(_windowSize, (i) =>
               List.generate(_melBins, (j) =>
                   [last76[i][j]])));
-      // Output is [1, 1, 1, 96]
-      var embOutput = List.generate(1, (_) =>
-          List.generate(1, (_) =>
-              List.generate(1, (_) =>
-                  List.filled(_embedDim, 0.0))));
-      _embedding!.run(embInput, embOutput);
+      _embedding!.run(embInput, _embOutput);
 
       final embedding = Float32List(_embedDim);
       _embMin = double.infinity;
       _embMax = double.negativeInfinity;
       for (int i = 0; i < _embedDim; i++) {
-        final v = embOutput[0][0][0][i];
+        final v = _embOutput[0][0][0][i];
         embedding[i] = v;
         if (v < _embMin) _embMin = v;
         if (v > _embMax) _embMax = v;

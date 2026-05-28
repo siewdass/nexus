@@ -1,5 +1,5 @@
-name: jarvis
-description: WakeWord hey jarvis offline con TFLite
+name: nexus
+description: WakeWord hey nexus offline con TFLite
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -18,5 +18,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/models/melspectrogram.tflite
-    - assets/models/embedding_model.tflite
-    - assets/models/hey_jarvis.tflite
+    - assets/models/embedding.tflite
+    - assets/models/nexus.tflite

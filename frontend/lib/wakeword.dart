@@ -52,10 +52,10 @@ class WakeWordDetector {
     _melspecModel!.resizeInputTensor(0, [1, 1280]);
     _melspecModel!.allocateTensors();
 
-    final b2 = await rootBundle.load('assets/models/embedding_model.tflite');
+    final b2 = await rootBundle.load('assets/models/embedding.tflite');
     _embedding = Interpreter.fromBuffer(b2.buffer.asUint8List());
 
-    final b3 = await rootBundle.load('assets/models/hey_jarvis.tflite');
+    final b3 = await rootBundle.load('assets/models/nexus.tflite');
     _classifier = Interpreter.fromBuffer(b3.buffer.asUint8List());
 
     _isReady = true;

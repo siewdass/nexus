@@ -18,9 +18,9 @@ Future<void> main() async {
       .initialize(const InitializationSettings(android: android, iOS: ios));
 
   final channel = AndroidNotificationChannel(
-    'jarvis_detected',
-    'Jarvis Wake Word',
-    description: 'Notificaciones cuando se detecta hey jarvis',
+    'nexus_detected',
+    'Nexus Wake Word',
+    description: 'Notificaciones cuando se detecta hey nexus',
     importance: Importance.high,
     playSound: true,
   );
@@ -44,7 +44,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
 
   String _status = 'Cargando modelo...';
   bool _listening = false;
-  bool _jarvisDetected = false;
+  bool _nexusDetected = false;
   bool _isStarting = false;
 
   static const _sampleRate = 16000;
@@ -53,7 +53,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
   void initState() {
     super.initState();
     _detector.onReady = () {
-      setState(() => _status = 'Di hey jarvis');
+      setState(() => _status = 'Di hey nexus');
     };
     _detector.onFirstPrediction = () {
       setState(() {
@@ -68,19 +68,19 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
       setState(() {
         _listening = false;
         _isStarting = false;
-        _jarvisDetected = true;
-        _status = 'Hey Jarvis! (${score.toStringAsFixed(2)})';
+        _nexusDetected = true;
+        _status = 'Hey Nexus! (${score.toStringAsFixed(2)})';
       });
       HapticFeedback.heavyImpact();
       SystemSound.play(SystemSoundType.alert);
       _notif.show(
         0,
-        'Hey Jarvis!',
+        'Hey Nexus!',
         'Wake word detectado (${score.toStringAsFixed(2)})',
         const NotificationDetails(
           android: AndroidNotificationDetails(
-            'jarvis_detected',
-            'Jarvis Wake Word',
+            'nexus_detected',
+            'Nexus Wake Word',
             importance: Importance.high,
             priority: Priority.high,
           ),
@@ -119,7 +119,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
         _listening = true;
         _isStarting = true;
         _status = 'Iniciando...';
-        _jarvisDetected = false;
+        _nexusDetected = false;
       });
     } else {
       Recorder.instance.stopStreamingData();
@@ -148,8 +148,8 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Jarvis'),
-        backgroundColor: _jarvisDetected ? Colors.orange : Colors.blue,
+        title: const Text('Nexus'),
+        backgroundColor: _nexusDetected ? Colors.orange : Colors.blue,
         actions: [
           IconButton(
             icon: const Icon(Icons.volume_up),
@@ -170,11 +170,11 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: _jarvisDetected ? Colors.orange : null,
+                color: _nexusDetected ? Colors.orange : null,
               ),
             ),
             const SizedBox(height: 40),
-            if (_jarvisDetected) ...[
+            if (_nexusDetected) ...[
               const Icon(Icons.smart_toy, size: 80, color: Colors.orange),
               const SizedBox(height: 20),
               const Text('Hola! En que puedo ayudarte?',

@@ -10,7 +10,8 @@ class VoiceTestScreen extends StatefulWidget {
 class _VoiceTestScreenState extends State<VoiceTestScreen> {
   final FlutterTts _tts = FlutterTts();
   final TextEditingController _textCtrl = TextEditingController(
-    text: 'Buenos días, señor. ¿En qué puedo ayudarle?',
+    text:
+        'Señor, detecto una anomalía en los sistemas de seguridad del nivel inferior. Iniciando protocolo de diagnóstico automático. Los sensores indican actividad inusual en el sector B. ¿Desea que active los sistemas de defensa secundarios?',
   );
   final TextEditingController _engineCtrl = TextEditingController();
   final TextEditingController _filterCtrl = TextEditingController();
@@ -22,14 +23,14 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
   bool _isPlaying = false;
   bool _loaded = false;
   double _pitch = 1.0;
+  double _rate = 0.45;
 
   List<Map> get _filteredVoices {
     final q = _filterCtrl.text.toLowerCase();
+    if (q.isEmpty) return _voices;
     return _voices.where((v) {
       final name = (v['name']?.toString() ?? '').toLowerCase();
       final locale = (v['locale']?.toString() ?? '').toLowerCase();
-      if (!name.contains('es-us-x') && !locale.contains('es-us-x')) return false;
-      if (q.isEmpty) return true;
       return name.contains(q) || locale.contains(q);
     }).toList();
   }
@@ -38,13 +39,25 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
   void initState() {
     super.initState();
     _tts.setCompletionHandler(() {
-      if (mounted) setState(() { _playingVoice = null; _isPlaying = false; });
+      if (mounted)
+        setState(() {
+          _playingVoice = null;
+          _isPlaying = false;
+        });
     });
     _tts.setCancelHandler(() {
-      if (mounted) setState(() { _playingVoice = null; _isPlaying = false; });
+      if (mounted)
+        setState(() {
+          _playingVoice = null;
+          _isPlaying = false;
+        });
     });
     _tts.setErrorHandler((_) {
-      if (mounted) setState(() { _playingVoice = null; _isPlaying = false; });
+      if (mounted)
+        setState(() {
+          _playingVoice = null;
+          _isPlaying = false;
+        });
     });
     _initTts();
   }
@@ -104,7 +117,7 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
       }
     }
     await _tts.setVoice(clean);
-    await _tts.setSpeechRate(0.45);
+    await _tts.setSpeechRate(_rate);
     await _tts.setPitch(_pitch);
     await _tts.setVolume(1.0);
     await _tts.speak(text);
@@ -133,7 +146,8 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
     if (feat.isNotEmpty) return 'features: $feat';
     final quality = v['quality']?.toString() ?? '';
     final latency = v['latency']?.toString() ?? '';
-    if (quality.isNotEmpty || latency.isNotEmpty) return 'quality: $quality  latency: $latency';
+    if (quality.isNotEmpty || latency.isNotEmpty)
+      return 'quality: $quality  latency: $latency';
     return '';
   }
 
@@ -213,18 +227,23 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
                           hint: const Text('Seleccionar motor'),
                           items: [
                             ..._engines.map((e) => DropdownMenuItem(
-                              value: e,
-                              child: Text(e, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-                            )),
+                                  value: e,
+                                  child: Text(e,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12)),
+                                )),
                             if (!_engines.contains('com.google.android.tts'))
                               const DropdownMenuItem(
                                 value: 'com.google.android.tts',
-                                child: Text('com.google.android.tts (Google TTS)',
-                                    style: TextStyle(fontSize: 12, color: Colors.blue)),
+                                child: Text(
+                                    'com.google.android.tts (Google TTS)',
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.blue)),
                               ),
                           ],
                           onChanged: (v) {
-                            if (v != null && v != _currentEngine) _switchEngine(v);
+                            if (v != null && v != _currentEngine)
+                              _switchEngine(v);
                           },
                         ),
                       ),
@@ -237,9 +256,11 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
                         child: TextField(
                           controller: _engineCtrl,
                           decoration: const InputDecoration(
-                            hintText: 'Engine package (ej: com.google.android.tts)',
+                            hintText:
+                                'Engine package (ej: com.google.android.tts)',
                             border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             isDense: true,
                           ),
                           style: const TextStyle(fontSize: 12),
@@ -249,7 +270,8 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
                       ElevatedButton(
                         onPressed: () {
                           final pkg = _engineCtrl.text.trim();
-                          if (pkg.isNotEmpty && pkg != _currentEngine) _switchEngine(pkg);
+                          if (pkg.isNotEmpty && pkg != _currentEngine)
+                            _switchEngine(pkg);
                         },
                         child: const Text('Ir'),
                       ),
@@ -283,6 +305,30 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
             ),
           ),
           const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                const Text('Rate', style: TextStyle(fontSize: 13)),
+                Expanded(
+                  child: Slider(
+                    value: _rate,
+                    min: 0.1,
+                    max: 1.5,
+                    divisions: 14,
+                    label: _rate.toStringAsFixed(2),
+                    onChanged: (v) {
+                      _tts.setSpeechRate(v);
+                      setState(() => _rate = v);
+                    },
+                  ),
+                ),
+                Text(_rate.toStringAsFixed(2),
+                    style: const TextStyle(fontSize: 13)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
           if (_loaded)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -291,12 +337,16 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
                 decoration: InputDecoration(
                   hintText: 'Filtrar (ej: es, en)',
                   border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   isDense: true,
                   suffixIcon: _filterCtrl.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 16),
-                          onPressed: () { _filterCtrl.clear(); setState(() {}); },
+                          onPressed: () {
+                            _filterCtrl.clear();
+                            setState(() {});
+                          },
                         )
                       : null,
                 ),
@@ -330,7 +380,9 @@ class _VoiceTestScreenState extends State<VoiceTestScreen> {
                     ),
                     title: Text(_voiceLabel(v)),
                     subtitle: features.isNotEmpty
-                        ? Text(features, style: TextStyle(fontSize: 11, color: Colors.grey[600]))
+                        ? Text(features,
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[600]))
                         : null,
                     trailing: IconButton(
                       icon: Icon(

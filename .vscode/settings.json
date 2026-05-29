@@ -15,7 +15,8 @@
     "**/pubspec.lock": false,
     "**/.packages": true,
     "**/*.g.dart": false,
-    "**/*.freezed.dart": false
+    "**/*.freezed.dart": false,
+    ".vscode": true,
   },
   "search.exclude": {
     ".dart_tool": true,

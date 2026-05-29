@@ -9,8 +9,20 @@ import '../services/wake.dart';
 import '../services/tts.dart';
 import '../services/network.dart';
 import '../services/scanner.dart';
+import '../services/stt.dart';
+
+class _Interaction {
+  String query;
+  String think;
+  String response;
+  _Interaction()
+      : query = '',
+        think = '',
+        response = '';
+}
 
 final _tts = TtsService();
+final _stt = SttService();
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -23,12 +35,14 @@ class _HomeState extends State<Home> {
   StreamSubscription<AudioDataContainer>? _audioStream;
   final _bgService = FlutterBackgroundService();
 
-  String _status = 'Cargando modelo...';
-  String _thinkText = '';
+  final List<_Interaction> _interactions = [];
   bool _listening = false;
   bool _nexusDetected = false;
   bool _isStarting = false;
   bool _recording = false;
+  bool _modelsReady = false;
+  int _speakingIndex = -1;
+  int? _expandedThinkIndex;
 
   static const _sampleRate = 16000;
 
@@ -73,7 +87,8 @@ class _HomeState extends State<Home> {
 
     _detector.onReady = () async {
       await _tts.init();
-      setState(() => _status = 'Di nexus');
+      await _stt.init();
+      setState(() => _modelsReady = true);
       if (!networkService.isConnected) {
         final scan = Scanner.lastResult;
         if (scan != null) {
@@ -85,43 +100,42 @@ class _HomeState extends State<Home> {
     };
     _detector.onFirstPrediction = () {
       if (_isStarting) {
-        setState(() {
-          _isStarting = false;
-          _status = _listening ? 'Escuchando...' : 'Di nexus';
-        });
+        setState(() => _isStarting = false);
       }
     };
     _detector.onDetected = (score) async {
+      debugPrint('[HOME] nexus detected! score=$score');
       if (!_listening) return;
       await _stopRecorder();
       _bgService.invoke('stopService');
       HapticFeedback.heavyImpact();
       SystemSound.play(SystemSoundType.alert);
+
+      final interaction = _Interaction();
       setState(() {
-        _listening = false;
         _recording = false;
         _isStarting = false;
         _nexusDetected = true;
-        _thinkText = '';
-        _status = 'Conectando...';
+        _interactions.add(interaction);
       });
+
       await showDetectionNotification(score);
 
       if (!networkService.isConnected) {
         final scan = Scanner.lastResult;
         if (scan == null) {
-          setState(() => _status = 'Sin servidor');
+          interaction.response = 'Sin servidor';
+          _finishConversation();
           return;
         }
         try {
           await networkService.connect(host: scan.private, port: 5001);
         } catch (e) {
-          setState(() => _status = 'Error de conexión');
+          interaction.response = 'Error de conexión';
+          _finishConversation();
           return;
         }
       }
-
-      setState(() => _status = 'Preguntando...');
 
       final buffer = StringBuffer();
       final completer = Completer<String>();
@@ -132,7 +146,7 @@ class _HomeState extends State<Home> {
 
       tokenSub = networkService.tokens.listen((t) => buffer.write(t));
       thinkSub = networkService.think.listen((t) {
-        setState(() => _thinkText += t);
+        setState(() => interaction.think += t);
       });
       doneSub = networkService.done.listen((_) {
         if (!completer.isCompleted) completer.complete(buffer.toString());
@@ -146,20 +160,15 @@ class _HomeState extends State<Home> {
       );
 
       try {
-        final response = await completer.future
-            .timeout(const Duration(seconds: 15));
-        setState(() => _status = 'Respondiendo...');
+        final response =
+            await completer.future.timeout(const Duration(seconds: 15));
+        setState(() => interaction.response = response);
         await _tts.speakAndWait(response);
-        setState(() {
-          _nexusDetected = false;
-          _thinkText = '';
-          _status = 'Di nexus';
-        });
+        setState(() => _nexusDetected = false);
+        _startSttPhase();
       } catch (e) {
-        setState(() {
-          _thinkText = '';
-          _status = 'Error: $e';
-        });
+        setState(() => interaction.response = 'Error: $e');
+        _finishConversation();
       } finally {
         tokenSub.cancel();
         thinkSub.cancel();
@@ -170,47 +179,140 @@ class _HomeState extends State<Home> {
     _detector.loadModels();
   }
 
+  Future<void> _speakResponse(int index, String text) async {
+    if (text.isEmpty) return;
+    setState(() => _speakingIndex = index);
+    try {
+      await _tts.speakAndWait(text);
+    } catch (_) {}
+    setState(() => _speakingIndex = -1);
+  }
+
+  void _startSttPhase() {
+    debugPrint('[HOME] STT phase');
+    _stt.start().then((text) {
+      if (text != null && text.isNotEmpty) {
+        _handleQuery(text);
+      } else {
+        _finishConversation();
+      }
+    });
+  }
+
+  void _stopStt() {
+    _stt.stop();
+  }
+
+  void _finishConversation() {
+    _stopStt();
+    setState(() {
+      _listening = false;
+      _nexusDetected = false;
+    });
+  }
+
+  Future<void> _handleQuery(String text) async {
+    debugPrint('[HOME] _handleQuery: "$text"');
+    final interaction = _Interaction();
+    interaction.query = text;
+    setState(() => _interactions.add(interaction));
+
+    final buffer = StringBuffer();
+    final completer = Completer<String>();
+    StreamSubscription tokenSub;
+    StreamSubscription thinkSub;
+    StreamSubscription doneSub;
+    StreamSubscription errSub;
+
+    tokenSub = networkService.tokens.listen((t) => buffer.write(t));
+    thinkSub = networkService.think.listen((t) {
+      setState(() => interaction.think += t);
+    });
+    doneSub = networkService.done.listen((_) {
+      if (!completer.isCompleted) completer.complete(buffer.toString());
+    });
+    errSub = networkService.errors.listen((e) {
+      if (!completer.isCompleted) completer.completeError(e);
+    });
+
+    networkService.sendChat(text);
+
+    try {
+      final response =
+          await completer.future.timeout(const Duration(seconds: 15));
+      setState(() => interaction.response = response);
+      await _tts.speakAndWait(response);
+      _finishConversation();
+    } catch (e) {
+      setState(() => interaction.response = 'Error: $e');
+      _finishConversation();
+    } finally {
+      tokenSub.cancel();
+      thinkSub.cancel();
+      doneSub.cancel();
+      errSub.cancel();
+    }
+  }
+
   Future<void> _toggleListening() async {
-    if (!_detector.isReady) {
-      setState(() => _status = 'Espera, cargando modelo...');
-      return;
-    }
+    try {
+      if (!_detector.isReady) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cargando modelo...')),
+          );
+        }
+        return;
+      }
 
-    if (_nexusDetected) {
-      await _tts.stop();
-      setState(() => _nexusDetected = false);
-    }
+      if (_nexusDetected) {
+        await _tts.stop();
+        setState(() => _nexusDetected = false);
+      }
 
-    if (!await Permission.microphone.request().isGranted) {
-      setState(() => _status = 'Permiso denegado');
-      return;
-    }
+      if (!await Permission.microphone.request().isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Permiso de micrófono denegado')),
+          );
+        }
+        return;
+      }
 
-    await [Permission.notification].request();
-    await Permission.ignoreBatteryOptimizations.request();
+      await [Permission.notification].request();
+      await Permission.ignoreBatteryOptimizations.request();
 
-    if (!_listening) {
-      if (!_recording) await _startPrebuffering();
-      _detector.prepareForListening();
-      await _bgService.startService();
-      setState(() {
-        _listening = true;
-        _isStarting = true;
-        _status = 'Iniciando...';
-      });
-    } else {
-      _bgService.invoke('stopService');
-      await _stopRecorder();
-      setState(() {
-        _listening = false;
-        _isStarting = false;
-        _status = 'Pausado';
-      });
+      if (!_listening) {
+        _stopStt();
+        setState(() {
+          _listening = true;
+          _isStarting = true;
+        });
+        _detector.prepareForListening();
+        if (!_recording) await _startPrebuffering();
+        await _bgService.startService();
+      } else {
+        _stopStt();
+        _bgService.invoke('stopService');
+        await _stopRecorder();
+        setState(() {
+          _listening = false;
+          _isStarting = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('TOGGLE ERROR: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     }
   }
 
   @override
   void dispose() {
+    _stopStt();
     _stopRecorder();
     _detector.dispose();
     super.dispose();
@@ -224,80 +326,220 @@ class _HomeState extends State<Home> {
         backgroundColor: _nexusDetected ? Colors.orange : Colors.blue,
         actions: const [],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _toggleListening,
+        backgroundColor: _listening ? Colors.red : Colors.green,
+        child: _isStarting
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : Icon(
+                _listening ? Icons.stop : Icons.play_arrow,
+                size: 28,
+              ),
+      ),
+      body: _interactions.isEmpty && !_modelsReady
+          ? const Center(
+              child: Text(
+                'Nexus',
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              ),
+            )
+          : _interactions.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Nexus',
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _interactions.length,
+                  itemBuilder: (context, index) {
+                    final item = _interactions[index];
+                    final isLast = index == _interactions.length - 1;
+                    return _InteractionCard(
+                      interaction: item,
+                      isActive: isLast && _nexusDetected,
+                      isSpeaking: _speakingIndex == index,
+                      isThinkExpanded: _expandedThinkIndex == index,
+                      onToggleThink: () {
+                        setState(() {
+                          _expandedThinkIndex =
+                              _expandedThinkIndex == index ? null : index;
+                        });
+                      },
+                      onPlay: () => _speakResponse(index, item.response),
+                    );
+                  },
+                  ),
+      );
+    }  // build
+}  // _HomeState
+
+class _TextCard extends StatelessWidget {
+  final String text;
+  final bool isPlaying;
+  final VoidCallback? onPlay;
+  final Widget? trailing;
+
+  const _TextCard({
+    required this.text,
+    this.isPlaying = false,
+    this.onPlay,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SelectableText(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[700],
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              _status,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: _nexusDetected ? Colors.orange : null,
+            InkWell(
+              onTap: () => Clipboard.setData(ClipboardData(text: text)),
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child:
+                    Icon(Icons.content_copy, size: 14, color: Colors.grey[600]),
               ),
             ),
-            if (_thinkText.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Flexible(
-                child: Container(
-                  constraints: const BoxConstraints(maxHeight: 200),
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Text(
-                      _thinkText,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[700],
-                        fontStyle: FontStyle.italic,
+            if (onPlay != null)
+              isPlaying
+                  ? const Padding(
+                      padding: EdgeInsets.all(4),
+                      child: SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : InkWell(
+                      onTap: onPlay,
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Icon(Icons.volume_up,
+                            size: 14, color: Colors.grey[600]),
                       ),
                     ),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 40),
-            if (_nexusDetected) ...[
-              const Icon(Icons.smart_toy, size: 80, color: Colors.orange),
-              const SizedBox(height: 20),
-              const Text('Hola! En que puedo ayudarte?',
-                  style: TextStyle(fontSize: 18, fontStyle: FontStyle.italic)),
-              const SizedBox(height: 30),
-            ],
-            SizedBox(
-              width: 100,
-              height: 100,
-              child: FloatingActionButton(
-                onPressed: _toggleListening,
-                backgroundColor: _listening ? Colors.red : Colors.green,
-                child: _isStarting
-                    ? const SizedBox(
-                        width: 36,
-                        height: 36,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : Icon(
-                        _listening ? Icons.stop : Icons.play_arrow,
-                        size: 48,
-                      ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _listening ? 'Toca para detener' : 'Toca para iniciar',
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
-            ),
+            if (trailing != null) const SizedBox(width: 4),
+            if (trailing != null) trailing!,
           ],
         ),
-      ),
+      ],
+    );
+  }
+}
+
+class _InteractionCard extends StatelessWidget {
+  final _Interaction interaction;
+  final bool isActive;
+  final bool isSpeaking;
+  final bool isThinkExpanded;
+  final VoidCallback? onToggleThink;
+  final VoidCallback? onPlay;
+
+  const _InteractionCard({
+    required this.interaction,
+    this.isActive = false,
+    this.isSpeaking = false,
+    this.isThinkExpanded = false,
+    this.onToggleThink,
+    this.onPlay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (interaction.query.isNotEmpty)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: SelectableText(
+                interaction.query,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+                ),
+              ),
+            ),
+        if (isActive &&
+            interaction.response.isEmpty &&
+            interaction.think.isNotEmpty)
+          SelectableText(
+            interaction.think,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[700],
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        if (isActive && interaction.response.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        if (isThinkExpanded &&
+            interaction.think.isNotEmpty &&
+            interaction.response.isNotEmpty)
+          SelectableText(
+            interaction.think,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[700],
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        if (interaction.response.isNotEmpty)
+          _TextCard(
+            text: interaction.response,
+            onPlay: onPlay,
+            isPlaying: isSpeaking,
+            trailing: interaction.think.isNotEmpty
+                ? InkWell(
+                    onTap: () => onToggleThink?.call(),
+                    child: Tooltip(
+                      message: 'Razonamiento',
+                      child: Padding(
+                        padding: const EdgeInsets.all(2),
+                        child: Icon(
+                          isThinkExpanded
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          size: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+      ],
     );
   }
 }

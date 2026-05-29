@@ -18,6 +18,10 @@ class NetworkService {
   bool get isConnected => _socket?.connected ?? false;
 
   Future<void> connect({String host = 'localhost', int port = 5001}) async {
+    if (isConnected) {
+      debugPrint('NET connect skipped: already connected');
+      return;
+    }
     if (_connecting) {
       debugPrint('NET connect skipped: already connecting');
       return;

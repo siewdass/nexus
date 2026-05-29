@@ -17,7 +17,7 @@ class LlmService {
     _engine = await LlamaEngine.spawn(
       libraryPath: dylib,
       modelParams: ModelParams(path: model, gpuLayers: 99),
-      contextParams: const ContextParams(nCtx: 4096),
+      contextParams: const ContextParams(nCtx: 16384),
     );
   }
 }

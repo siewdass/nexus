@@ -4,8 +4,9 @@ Servidor Dart que corre un LLM local (Qwen3-0.6B) vía llama.cpp con aceleració
 
 ### Funcionalidad
 
-- **LLM local** — Qwen3-0.6B-Q8_0 con llama.cpp, 99 capas GPU por Metal, contexto 4096
-- **Socket.IO server** — puerto `5001`, evento `chat` → recibe texto, responde con streaming de `token` + `done`
+- **LLM local** — Qwen3-0.6B-Q8_0 con llama.cpp, 99 capas GPU por Metal, contexto **16384**
+- **Socket.IO server** — puerto `5001`, evento `chat` → recibe texto, responde con streaming de `think` + `token` + `done`
+- **Think parsing** — extrae tags `<think>...</think>` del stream de tokens en tiempo real, emite evento separado `think`
 - **UDP discovery** — puerto `5002`, responde a `NEXUS_DISCOVER` con `{private, public}` (IP local + URL cloudflared)
 - **Túnel Cloudflare** — `cloudflared tunnel --url http://localhost:5001`, URL pública cambiante
 - **Hot reload** — `hotreloader: ^4.4.0`, recarga código sin reiniciar el LLM
@@ -25,20 +26,18 @@ dart compile exe lib/main.dart -o nexus.bin
 
 ## Frontend
 
-App Flutter Android que detecta "nexus" offline y se conecta al backend.
+App Flutter Android offline voice first.
 
-### Servicios
+### Features
 
-- **WakeService** (`services/wake.dart`) — pipeline TFLite de 3 modelos (melspectrograma → embedding → clasificador). Detección offline, threshold 0.51, sliding window de 10 frames, debounce 3s
-- **TtsService** (`services/tts.dart`) — Google TTS engine, voz `es-us-x-esd-network`, rate 0.45, pitch 1.0
-- **NetworkService** (`services/network.dart`) — cliente Socket.IO, conexión websocket al backend, evento `chat` → streams `token`/`done`
-- **Scanner** (`services/scanner.dart`) — descubrimiento UDP broadcast, envía `NEXUS_DISCOVER` a puerto 5002, recibe `{private, public}`
-- **Notifications** (`services/notifications.dart`) — canales `nexus_detected` + `nexus_service`, muestra notificación al detectar
-
-### Pantallas
-
-- **Loading** (`screens/loading.dart`) — pantalla de inicio, corre `Scanner.discover()`, navega a Home si encuentra backend
-- **Home** (`screens/home.dart`) — botón Play/Stop, pre-buffering de audio, wake word detection, TTS al detectar, vibración + sonido + notificación
+- Wake word detection offline con TFLite (3 modelos: melspectrograma → embedding → clasificador), threshold 0.51
+- Text to speech con Google TTS engine, voz `es-us-x-esd-network`
+- Reconocimiento de voz continuo vía `speech_to_text`, auto-restart tras 5s de silencio, loop de conversación automático
+- Cliente Socket.IO con streams de `token`/`think`/`done`/`errors`
+- Descubrimiento automático del backend por UDP broadcast (puerto 5002)
+- Notificaciones al detectar wake word
+- Razonamiento del LLM (think) colapsable con animación
+- Historial de interacciones con botones copiar/reproducir
 
 ### Permisos
 

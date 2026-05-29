@@ -345,25 +345,11 @@ class _HomeState extends State<Home> {
             ),
           ],
         ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: _Fab(
+        listening: _listening,
+        isStarting: _isStarting,
         onPressed: _toggleListening,
-        backgroundColor: _listening
-            ? context.watch<ThemeService>().green
-            : context.watch<ThemeService>().inactiveBg,
-        child: _isStarting
-            ? SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(theme.primaryText),
-                ),
-              )
-            : Icon(
-                _listening ? Icons.stop : Icons.play_arrow,
-                size: 28,
-                color: theme.primaryText,
-              ),
+        theme: theme,
       ),
       body: _interactions.isEmpty && !_modelsReady
           ? const Center(
@@ -374,7 +360,7 @@ class _HomeState extends State<Home> {
                   child: Icon(
                     Icons.smart_toy,
                     size: 80,
-                    color: context.watch<ThemeService>().primaryText,
+                    color: theme.primaryText,
                   ),
                 )
               : ListView.builder(
@@ -402,6 +388,45 @@ class _HomeState extends State<Home> {
     );
     }  // build
 }  // _HomeState
+
+class _Fab extends StatelessWidget {
+  final bool listening;
+  final bool isStarting;
+  final VoidCallback onPressed;
+  final ThemeService theme;
+
+  const _Fab({
+    required this.listening,
+    required this.isStarting,
+    required this.onPressed,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: FloatingActionButton(
+        onPressed: onPressed,
+        backgroundColor: listening ? theme.green : theme.inactiveBg,
+        child: isStarting
+            ? SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(theme.primaryText),
+                ),
+              )
+            : Icon(
+                listening ? Icons.stop : Icons.play_arrow,
+                size: 28,
+                color: theme.primaryText,
+              ),
+      ),
+    );
+  }
+}
 
 class _TextCard extends StatelessWidget {
   final String text;

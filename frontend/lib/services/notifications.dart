@@ -34,7 +34,7 @@ Future<void> initNotifications() async {
 Future<void> showDetectionNotification(double score) async {
   await notif.show(
     0,
-    'Hey Nexus!',
+    'Nexus!',
     'Wake word detectado (${score.toStringAsFixed(2)})',
     const NotificationDetails(
       android: AndroidNotificationDetails(

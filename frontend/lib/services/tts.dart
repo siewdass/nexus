@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
@@ -34,8 +35,17 @@ class TtsService {
       await _tts.setPitch(1.0);
       await _tts.speak(text);
     } catch (e) {
-      debugPrint('TTS ERROR: $e');
+      debugPrint('TTS SPEAK ERROR: $e');
     }
+  }
+
+  Future<void> speakAndWait(String text) async {
+    final completer = Completer<void>();
+    _tts.setCompletionHandler(() {
+      if (!completer.isCompleted) completer.complete();
+    });
+    await speak(text);
+    await completer.future.timeout(const Duration(seconds: 60));
   }
 
   Future<void> stop() async {

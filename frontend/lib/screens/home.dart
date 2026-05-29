@@ -7,6 +7,8 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import '../services/notifications.dart';
 import '../services/wake.dart';
 import '../services/tts.dart';
+import '../services/network.dart';
+import '../services/scanner.dart';
 
 final _tts = TtsService();
 
@@ -22,6 +24,7 @@ class _HomeState extends State<Home> {
   final _bgService = FlutterBackgroundService();
 
   String _status = 'Cargando modelo...';
+  String _thinkText = '';
   bool _listening = false;
   bool _nexusDetected = false;
   bool _isStarting = false;
@@ -70,30 +73,99 @@ class _HomeState extends State<Home> {
 
     _detector.onReady = () async {
       await _tts.init();
-      await _startPrebuffering();
-      setState(() => _status = 'Di hey nexus');
+      setState(() => _status = 'Di nexus');
+      if (!networkService.isConnected) {
+        final scan = Scanner.lastResult;
+        if (scan != null) {
+          try {
+            await networkService.connect(host: scan.private, port: 5001);
+          } catch (_) {}
+        }
+      }
     };
     _detector.onFirstPrediction = () {
       if (_isStarting) {
         setState(() {
           _isStarting = false;
-          _status = _listening ? 'Escuchando...' : 'Di hey nexus';
+          _status = _listening ? 'Escuchando...' : 'Di nexus';
         });
       }
     };
     _detector.onDetected = (score) async {
       if (!_listening) return;
+      await _stopRecorder();
       _bgService.invoke('stopService');
       HapticFeedback.heavyImpact();
       SystemSound.play(SystemSoundType.alert);
       setState(() {
         _listening = false;
+        _recording = false;
         _isStarting = false;
         _nexusDetected = true;
-        _status = 'Hey Nexus! (${score.toStringAsFixed(2)})';
+        _thinkText = '';
+        _status = 'Conectando...';
       });
       await showDetectionNotification(score);
-      await _tts.speak('Hola. En que puedo ayudarte?');
+
+      if (!networkService.isConnected) {
+        final scan = Scanner.lastResult;
+        if (scan == null) {
+          setState(() => _status = 'Sin servidor');
+          return;
+        }
+        try {
+          await networkService.connect(host: scan.private, port: 5001);
+        } catch (e) {
+          setState(() => _status = 'Error de conexión');
+          return;
+        }
+      }
+
+      setState(() => _status = 'Preguntando...');
+
+      final buffer = StringBuffer();
+      final completer = Completer<String>();
+      StreamSubscription tokenSub;
+      StreamSubscription thinkSub;
+      StreamSubscription doneSub;
+      StreamSubscription errSub;
+
+      tokenSub = networkService.tokens.listen((t) => buffer.write(t));
+      thinkSub = networkService.think.listen((t) {
+        setState(() => _thinkText += t);
+      });
+      doneSub = networkService.done.listen((_) {
+        if (!completer.isCompleted) completer.complete(buffer.toString());
+      });
+      errSub = networkService.errors.listen((e) {
+        if (!completer.isCompleted) completer.completeError(e);
+      });
+
+      networkService.sendChat(
+        'El usuario te ha llamado. Salúdalo brevemente y pregúntale cómo puedes ayudarle.',
+      );
+
+      try {
+        final response = await completer.future
+            .timeout(const Duration(seconds: 15));
+        setState(() => _status = 'Respondiendo...');
+        await _tts.speakAndWait(response);
+        setState(() {
+          _nexusDetected = false;
+          _thinkText = '';
+          _status = 'Di nexus';
+        });
+      } catch (e) {
+        setState(() {
+          _thinkText = '';
+          _status = 'Error: $e';
+        });
+      } finally {
+        tokenSub.cancel();
+        thinkSub.cancel();
+        doneSub.cancel();
+        errSub.cancel();
+      }
     };
     _detector.loadModels();
   }
@@ -114,12 +186,11 @@ class _HomeState extends State<Home> {
       return;
     }
 
-    if (!_recording) await _startPrebuffering();
-
     await [Permission.notification].request();
     await Permission.ignoreBatteryOptimizations.request();
 
     if (!_listening) {
+      if (!_recording) await _startPrebuffering();
       _detector.prepareForListening();
       await _bgService.startService();
       setState(() {
@@ -129,6 +200,7 @@ class _HomeState extends State<Home> {
       });
     } else {
       _bgService.invoke('stopService');
+      await _stopRecorder();
       setState(() {
         _listening = false;
         _isStarting = false;
@@ -164,6 +236,30 @@ class _HomeState extends State<Home> {
                 color: _nexusDetected ? Colors.orange : null,
               ),
             ),
+            if (_thinkText.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Flexible(
+                child: Container(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      _thinkText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 40),
             if (_nexusDetected) ...[
               const Icon(Icons.smart_toy, size: 80, color: Colors.orange),

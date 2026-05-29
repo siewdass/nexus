@@ -1,26 +1,19 @@
 ## Backend
 
-Nexus Desktop — Servidor Socket.IO que corre un LLM (Qwen3-0.6B) via llama.cpp con Metal (GPU).
+Servidor Dart que corre un LLM local (Qwen3-0.6B) vía llama.cpp con aceleración Metal.
 
-### Features
+### Funcionalidad
 
-- **LLM local** — Qwen3-0.6B-Q8_0 via llama.cpp con aceleración Metal
-- **Socket.IO** — comunicación bidireccional en tiempo real
-- **Túnel Cloudflare** — acceso remoto sin exponer puertos
-- **Hot reload** — recarga de código en desarrollo sin reiniciar el LLM
+- **LLM local** — Qwen3-0.6B-Q8_0 con llama.cpp, 99 capas GPU por Metal, contexto 4096
+- **Socket.IO server** — puerto `5001`, evento `chat` → recibe texto, responde con streaming de `token` + `done`
+- **UDP discovery** — puerto `5002`, responde a `NEXUS_DISCOVER` con `{private, public}` (IP local + URL cloudflared)
+- **Túnel Cloudflare** — `cloudflared tunnel --url http://localhost:5001`, URL pública cambiante
+- **Hot reload** — `hotreloader: ^4.4.0`, recarga código sin reiniciar el LLM
 
 ### Development
 
 ```sh
 ./backend.sh
-```
-
-O manual:
-
-```sh
-cd backend
-dart pub get
-dart --enable-vm-service lib/main.dart
 ```
 
 ### Build
@@ -32,15 +25,20 @@ dart compile exe lib/main.dart -o nexus.bin
 
 ## Frontend
 
-Nexus Companion — App Flutter para Android que detecta "nexus" offline con TFLite.
+App Flutter Android que detecta "nexus" offline y se conecta al backend.
 
-### Features
+### Servicios
 
-- **Wake word detection offline** — "nexus" via TFLite, sin internet, con pantalla apagada
-- **Notificación + vibración + sonido** al detectar el wake word
-- **Foreground service** — sigue escuchando con la app en segundo plano
-- **TTS** — voces del sistema con Google TTS engine
-- **Socket.IO** — se conecta al backend para chat con el LLM
+- **WakeService** (`services/wake.dart`) — pipeline TFLite de 3 modelos (melspectrograma → embedding → clasificador). Detección offline, threshold 0.51, sliding window de 10 frames, debounce 3s
+- **TtsService** (`services/tts.dart`) — Google TTS engine, voz `es-us-x-esd-network`, rate 0.45, pitch 1.0
+- **NetworkService** (`services/network.dart`) — cliente Socket.IO, conexión websocket al backend, evento `chat` → streams `token`/`done`
+- **Scanner** (`services/scanner.dart`) — descubrimiento UDP broadcast, envía `NEXUS_DISCOVER` a puerto 5002, recibe `{private, public}`
+- **Notifications** (`services/notifications.dart`) — canales `nexus_detected` + `nexus_service`, muestra notificación al detectar
+
+### Pantallas
+
+- **Loading** (`screens/loading.dart`) — pantalla de inicio, corre `Scanner.discover()`, navega a Home si encuentra backend
+- **Home** (`screens/home.dart`) — botón Play/Stop, pre-buffering de audio, wake word detection, TTS al detectar, vibración + sonido + notificación
 
 ### Permisos
 
@@ -55,18 +53,9 @@ Nexus Companion — App Flutter para Android que detecta "nexus" offline con TFL
 ./frontend.sh
 ```
 
-O manual:
-
-```sh
-cd frontend
-flutter pub get
-flutter run
-```
-
 ### Build
 
 ```sh
 cd frontend
 flutter build apk --target-platform android-arm64
 ```
-

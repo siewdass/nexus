@@ -45,9 +45,24 @@ class WakeService {
   bool get isStarting => _isStarting;
 
   void prepareForListening() {
+    _audioBuffer.clear();
     _recentScores.clear();
+    _melBuffer.clear();
+    _featureBuffer.clear();
+    _predictionCount = 0;
+    _processingAudio = false;
     _isStarting = true;
     _lastTrigger = null;
+    for (int i = 0; i < _windowSize; i++) {
+      _melBuffer.add(Float32List(_melBins)..fillRange(0, _melBins, 1.0));
+    }
+  }
+
+  void _prefillBuffers() {
+    _melBuffer.clear();
+    for (int i = 0; i < _windowSize; i++) {
+      _melBuffer.add(Float32List(_melBins)..fillRange(0, _melBins, 1.0));
+    }
   }
 
   Future<void> loadModels() async {
@@ -65,6 +80,7 @@ class WakeService {
     _classifier = Interpreter.fromBuffer(b3.buffer.asUint8List());
 
     _isReady = true;
+    _prefillBuffers();
     onReady?.call();
   }
 

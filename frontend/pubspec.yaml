@@ -1,5 +1,5 @@
 name: nexus
-description: WakeWord hey nexus offline con TFLite
+description: WakeWord nexus offline con TFLite
 publish_to: 'none'
 version: 1.0.0+1
 

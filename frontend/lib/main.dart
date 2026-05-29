@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'services/notifications.dart';
-import 'services/network.dart';
-import 'screens/home.dart';
-
-final networkService = NetworkService();
+import 'screens/loading.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,7 +9,7 @@ Future<void> main() async {
   await initNotifications();
   await _initBackgroundService();
 
-  runApp(const MaterialApp(home: Home()));
+  runApp(const MaterialApp(home: LoadingScreen()));
 }
 
 Future<void> _initBackgroundService() async {

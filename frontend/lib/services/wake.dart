@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 
-class WakeWordDetector {
+class WakeService {
   Interpreter? _melspecModel;
   Interpreter? _embedding;
   Interpreter? _classifier;

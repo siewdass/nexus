@@ -5,11 +5,11 @@ import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:flutter_background_service_android/flutter_background_service_android.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'wakeword.dart';
-import 'voice_test_screen.dart';
 
 final _notif = FlutterLocalNotificationsPlugin();
+final _tts = FlutterTts();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -85,35 +85,92 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
   bool _listening = false;
   bool _nexusDetected = false;
   bool _isStarting = false;
+  bool _recording = false;
 
   static const _sampleRate = 16000;
+
+  Future<void> _startPrebuffering() async {
+    if (_recording) return;
+    if (!await Permission.microphone.request().isGranted) return;
+    try {
+      await Recorder.instance.init(
+        format: PCMFormat.s16le,
+        sampleRate: _sampleRate,
+        channels: RecorderChannels.mono,
+      );
+      Recorder.instance.start();
+      Recorder.instance.startStreamingData();
+      _recording = true;
+      _audioStream?.cancel();
+      _audioStream = Recorder.instance.uint8ListStream.listen((data) {
+        _detector.feedAudio(data.rawData);
+      });
+    } catch (e) {
+      debugPrint('PREBUF ERROR: $e');
+    }
+  }
+
+  Future<void> _stopRecorder() async {
+    if (!_recording) return;
+    _audioStream?.cancel();
+    _audioStream = null;
+    try {
+      Recorder.instance.stopStreamingData();
+      Recorder.instance.stop();
+      Recorder.instance.deinit();
+    } catch (e) {
+      debugPrint('REC STOP ERROR: $e');
+    }
+    _recording = false;
+  }
 
   @override
   void initState() {
     super.initState();
-    _detector.onReady = () {
+
+    _detector.onReady = () async {
+      try {
+        await _tts.setEngine('com.google.android.tts');
+        final voices = await _tts.getVoices;
+        final target = (voices as List).cast<Map>().firstWhere(
+              (v) => (v['name'] as String?)?.toLowerCase() == 'es-us-x-esd-network',
+              orElse: () => const <String, String>{},
+            );
+        if (target.isNotEmpty) {
+          final clean = <String, String>{};
+          for (final e in target.entries) {
+            if (e.key != null && e.value != null) {
+              clean[e.key.toString()] = e.value.toString();
+            }
+          }
+          await _tts.setVoice(clean);
+        }
+      } catch (e) {
+        debugPrint('TTS INIT ERROR: $e');
+      }
+      await _startPrebuffering();
       setState(() => _status = 'Di hey nexus');
     };
     _detector.onFirstPrediction = () {
-      setState(() {
-        _isStarting = false;
-        _status = 'Escuchando...';
-      });
+      if (_isStarting) {
+        setState(() {
+          _isStarting = false;
+          _status = _listening ? 'Escuchando...' : 'Di hey nexus';
+        });
+      }
     };
-    _detector.onDetected = (score) {
-      _audioStream?.cancel();
-      Recorder.instance.stopStreamingData();
-      Recorder.instance.stop();
+    _detector.onDetected = (score) async {
+      if (!_listening) return;
       _bgService.invoke('stopService');
+      HapticFeedback.heavyImpact();
+      SystemSound.play(SystemSoundType.alert);
       setState(() {
         _listening = false;
         _isStarting = false;
         _nexusDetected = true;
         _status = 'Hey Nexus! (${score.toStringAsFixed(2)})';
       });
-      HapticFeedback.heavyImpact();
-      SystemSound.play(SystemSoundType.alert);
-      _notif.show(
+      await _notif.show(
         0,
         'Hey Nexus!',
         'Wake word detectado (${score.toStringAsFixed(2)})',
@@ -126,6 +183,13 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
           ),
         ),
       );
+      try {
+        await _tts.setSpeechRate(0.45);
+        await _tts.setPitch(1.0);
+        await _tts.speak('Hola. En que puedo ayudarte?');
+      } catch (e) {
+        debugPrint('TTS ERROR: $e');
+      }
     };
     _detector.loadModels();
   }
@@ -135,39 +199,32 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
       setState(() => _status = 'Espera, cargando modelo...');
       return;
     }
+
+    if (_nexusDetected) {
+      await _tts.stop();
+      setState(() => _nexusDetected = false);
+    }
+
     if (!await Permission.microphone.request().isGranted) {
       setState(() => _status = 'Permiso denegado');
       return;
     }
+
+    if (!_recording) await _startPrebuffering();
+
     await [Permission.notification].request();
+    await Permission.ignoreBatteryOptimizations.request();
 
     if (!_listening) {
-      _detector.reset();
-
-      await Recorder.instance.init(
-        format: PCMFormat.s16le,
-        sampleRate: _sampleRate,
-        channels: RecorderChannels.mono,
-      );
-      Recorder.instance.start();
-      Recorder.instance.startStreamingData();
-      _audioStream = Recorder.instance.uint8ListStream.listen((data) {
-        _detector.feedAudio(data.rawData);
-      });
-
+      _detector.prepareForListening();
       await _bgService.startService();
       setState(() {
         _listening = true;
         _isStarting = true;
         _status = 'Iniciando...';
-        _nexusDetected = false;
       });
     } else {
-      Recorder.instance.stopStreamingData();
-      Recorder.instance.stop();
-      await _audioStream?.cancel();
       _bgService.invoke('stopService');
-
       setState(() {
         _listening = false;
         _isStarting = false;
@@ -178,10 +235,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
 
   @override
   void dispose() {
-    Recorder.instance.stopStreamingData();
-    Recorder.instance.stop();
-    Recorder.instance.deinit();
-    _audioStream?.cancel();
+    _stopRecorder();
     _detector.dispose();
     super.dispose();
   }
@@ -192,16 +246,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
       appBar: AppBar(
         title: const Text('Nexus'),
         backgroundColor: _nexusDetected ? Colors.orange : Colors.blue,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.volume_up),
-            onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const VoiceTestScreen(),
-                )),
-          ),
-        ],
+        actions: const [],
       ),
       body: Center(
         child: Column(

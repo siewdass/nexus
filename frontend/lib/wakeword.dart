@@ -44,6 +44,12 @@ class WakeWordDetector {
   bool get isReady => _isReady;
   bool get isStarting => _isStarting;
 
+  void prepareForListening() {
+    _recentScores.clear();
+    _isStarting = true;
+    _lastTrigger = null;
+  }
+
   Future<void> loadModels() async {
     final b1 = await rootBundle.load('assets/melspectrogram.tflite');
     final opts = InterpreterOptions()..addDelegate(XNNPackDelegate());

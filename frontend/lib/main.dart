@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'wakeword.dart';
 import 'voice_test_screen.dart';
 
@@ -17,19 +19,55 @@ Future<void> main() async {
   await _notif
       .initialize(const InitializationSettings(android: android, iOS: ios));
 
-  final channel = AndroidNotificationChannel(
-    'nexus_detected',
-    'Nexus Wake Word',
-    description: 'Notificaciones cuando se detecta hey nexus',
-    importance: Importance.high,
-    playSound: true,
-  );
-  await _notif
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
+  for (final ch in [
+    AndroidNotificationChannel(
+      'nexus_detected',
+      'Nexus Wake Word',
+      description: 'Notificaciones cuando se detecta hey nexus',
+      importance: Importance.high,
+      playSound: true,
+    ),
+    AndroidNotificationChannel(
+      'nexus_service',
+      'Nexus Service',
+      description: 'Servicio de deteccion en segundo plano',
+      importance: Importance.low,
+      playSound: false,
+    ),
+  ]) {
+    await _notif
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(ch);
+  }
+
+  await _initBackgroundService();
 
   runApp(const MaterialApp(home: OpenWakeWordDemo()));
+}
+
+Future<void> _initBackgroundService() async {
+  final service = FlutterBackgroundService();
+  await service.configure(
+    androidConfiguration: AndroidConfiguration(
+      onStart: _onBgStart,
+      autoStart: false,
+      isForegroundMode: true,
+      notificationChannelId: 'nexus_service',
+      initialNotificationContent: 'Escuchando wake word...',
+      initialNotificationTitle: 'Nexus',
+      foregroundServiceNotificationId: 9999,
+      foregroundServiceTypes: [AndroidForegroundType.microphone],
+    ),
+    iosConfiguration: IosConfiguration(),
+  );
+}
+
+@pragma('vm:entry-point')
+void _onBgStart(ServiceInstance service) {
+  if (service is AndroidServiceInstance) {
+    service.on('stopService').listen((_) => service.stopSelf());
+  }
 }
 
 class OpenWakeWordDemo extends StatefulWidget {
@@ -41,6 +79,7 @@ class OpenWakeWordDemo extends StatefulWidget {
 class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
   final _detector = WakeWordDetector();
   StreamSubscription<AudioDataContainer>? _audioStream;
+  final _bgService = FlutterBackgroundService();
 
   String _status = 'Cargando modelo...';
   bool _listening = false;
@@ -65,6 +104,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
       _audioStream?.cancel();
       Recorder.instance.stopStreamingData();
       Recorder.instance.stop();
+      _bgService.invoke('stopService');
       setState(() {
         _listening = false;
         _isStarting = false;
@@ -115,6 +155,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
         _detector.feedAudio(data.rawData);
       });
 
+      await _bgService.startService();
       setState(() {
         _listening = true;
         _isStarting = true;
@@ -125,6 +166,7 @@ class _OpenWakeWordDemoState extends State<OpenWakeWordDemo> {
       Recorder.instance.stopStreamingData();
       Recorder.instance.stop();
       await _audioStream?.cancel();
+      _bgService.invoke('stopService');
 
       setState(() {
         _listening = false;

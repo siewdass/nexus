@@ -45,17 +45,17 @@ class WakeWordDetector {
   bool get isStarting => _isStarting;
 
   Future<void> loadModels() async {
-    final b1 = await rootBundle.load('assets/models/melspectrogram.tflite');
+    final b1 = await rootBundle.load('assets/melspectrogram.tflite');
     final opts = InterpreterOptions()..addDelegate(XNNPackDelegate());
     _melspecModel =
         Interpreter.fromBuffer(b1.buffer.asUint8List(), options: opts);
     _melspecModel!.resizeInputTensor(0, [1, 1280]);
     _melspecModel!.allocateTensors();
 
-    final b2 = await rootBundle.load('assets/models/embedding.tflite');
+    final b2 = await rootBundle.load('assets/embedding.tflite');
     _embedding = Interpreter.fromBuffer(b2.buffer.asUint8List());
 
-    final b3 = await rootBundle.load('assets/models/nexus.tflite');
+    final b3 = await rootBundle.load('assets/nexus.tflite');
     _classifier = Interpreter.fromBuffer(b3.buffer.asUint8List());
 
     _isReady = true;
@@ -211,7 +211,7 @@ class WakeWordDetector {
               const Duration(milliseconds: _debounceMs)) {
         _lastTrigger = now;
         _recentScores.clear();
-        onDetected?.call(avg);
+        onDetected?.call(score);
       }
     }
   }

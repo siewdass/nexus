@@ -1,81 +1,65 @@
-# Jarvis
+# Nexus
 
-Wake word detection (Android) + LLM backend con gRPC.
+Wake word detection offline (Android) + LLM backend con Socket.IO.
 
-## Estructura
+## Features
 
-```
-jarvis/
-├── proto/                 # Definiciones .proto (compartidas)
-│   └── jarvis.proto
-├── backend/               # Servidor Dart + LLM (llama.cpp)
-│   └── pubspec.yaml
-├── frontend/              # App Flutter (wake word + TTS)
-│   └── pubspec.yaml
-└── README.md
-```
-
-## Proto / gRPC
-
-### 1. Instalar protoc-gen-dart
-
-```sh
-dart pub global activate protoc_plugin
-```
-
-Asegurate que `~/.pub-cache/bin` esté en tu `PATH`:
-
-```sh
-export PATH="$PATH":"$HOME/.pub-cache/bin"
-```
-
-Agregá esa línea a `~/.zshrc` para que persista.
-
-### 2. Generar stubs Dart
-
-Desde `backend/`:
-
-```sh
-cd backend
-protoc --dart_out="grpc:lib/src/generated" -I../proto ../proto/jarvis.proto
-```
-
-Esto genera:
-- `lib/src/generated/jarvis.pb.dart` — mensajes
-- `lib/src/generated/jarvis.pbgrpc.dart` — servicio gRPC
-- `lib/src/generated/jarvis.pbjson.dart` — JSON
-
-### 3. Regenerar
-
-Cuando cambies `proto/jarvis.proto`, repetí el paso 2.
+- **Wake word detection offline** — "hey nexus" via TFLite, sin internet, con pantalla apagada
+- **Notificación + vibración + sonido** al detectar el wake word
+- **LLM local** — Qwen3-0.6B via llama.cpp con Metal (GPU)
+- **Socket.IO** — comunicación en tiempo real entre app y backend
+- **TTS** — voces del sistema con Google TTS engine
+- **Túnel Cloudflare** — acceso remoto sin exponer puertos
 
 ## Backend
 
+Servidor Socket.IO que corre un LLM (Qwen3-0.6B) via llama.cpp.
+
 ### Requisitos
 
-- `libllama.dylib` (compilado de llama.cpp)
-- Modelo GGUF (ej. `Qwen3.5-0.8B-Q8.gguf`)
+- `backend/assets/libllama.dylib` — compilado de llama.cpp
+- `backend/assets/Qwen3-0.6B-Q8_0.gguf` — modelo (se descarga solo si falta)
 
-Ambos en la raíz de `jarvis/`.
+### Development
 
-### Dev
+```sh
+./backend.sh
+```
+
+O manual:
 
 ```sh
 cd backend
 dart pub get
-dart run lib/main.dart
+dart --enable-vm-service lib/main.dart
 ```
 
-Servidor gRPC en `0.0.0.0:50051`.
-
-### Compilar
+### Build
 
 ```sh
-cd backend
-dart compile exe lib/main.dart -o bin/jarvis
+dart compile exe lib/main.dart -o nexus.bin
 ```
 
+Servidor Socket.IO en `0.0.0.0:5001`. Eventos:
+
+| Evento | Dirección | Descripción |
+|---|---|---|
+| `chat` | cliente → servidor | `{text: "consulta"}` |
+| `token` | servidor → cliente | fragmento de texto generado |5
+| `done` | servidor → cliente | generación terminada |
+| `error` | servidor → cliente | mensaje de error |
+
 ## Frontend
+
+App Flutter que detecta "hey nexus" offline con TFLite, reproduce sonido/vibra/notifica, y se conecta al backend via Socket.IO.
+
+### Development
+
+```sh
+./frontend.sh
+```
+
+O manual:
 
 ```sh
 cd frontend
@@ -83,9 +67,10 @@ flutter pub get
 flutter run
 ```
 
-### Build release
+### Build
 
 ```sh
 cd frontend
 flutter build apk --target-platform android-arm64
 ```
+

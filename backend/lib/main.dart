@@ -118,8 +118,12 @@ Future<void> main() async {
     }
   }
 
+  final connectedIds = <String>{};
+
   io.on('connection', (Socket client) {
-    print('Cliente conectado: ${client.id}');
+    final id = client.id ?? '';
+    if (!connectedIds.add(id)) return;
+    print('Cliente conectado: $id');
 
     client.on('chat', (data) async {
       if (llm.engine == null) {
@@ -161,7 +165,8 @@ Future<void> main() async {
     });
 
     client.on('disconnect', (_) {
-      print('Cliente desconectado: ${client.id}');
+      connectedIds.remove(client.id ?? '');
+      print('Cliente desconectado: $id');
     });
   });
 

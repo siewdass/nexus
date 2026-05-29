@@ -5,6 +5,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 class NetworkService {
   io.Socket? _socket;
   bool _connecting = false;
+  int _connectCount = 0;
   final _tokenController = StreamController<String>.broadcast();
   final _thinkController = StreamController<String>.broadcast();
   final _doneController = StreamController<void>.broadcast();
@@ -18,26 +19,43 @@ class NetworkService {
   bool get isConnected => _socket?.connected ?? false;
 
   Future<void> connect({String host = 'localhost', int port = 5001}) async {
+    final id = ++_connectCount;
+    debugPrint('NET connect#$id: host=$host:$port connected=$isConnected connecting=$_connecting');
     if (isConnected) {
-      debugPrint('NET connect skipped: already connected');
+      debugPrint('NET connect#$id skipped: already connected');
       return;
     }
     if (_connecting) {
-      debugPrint('NET connect skipped: already connecting');
+      debugPrint('NET connect#$id skipped: already connecting');
       return;
     }
     _connecting = true;
-    disconnect();
+    _socket?.disconnect();
+    _socket?.clearListeners();
 
     _socket = io.io('http://$host:$port', <String, dynamic>{
       'transports': ['websocket'],
       'reconnection': false,
+      'forceNew': true,
     });
 
     final completer = Completer<void>();
+    var firstConnect = true;
     _socket!.onConnect((_) {
-      debugPrint('NET connected');
+      if (firstConnect) {
+        firstConnect = false;
+        debugPrint('NET connect#$id connected');
+      }
       if (!completer.isCompleted) completer.complete();
+    });
+    _socket!.onDisconnect((_) {
+      debugPrint('NET connect#$id disconnected');
+    });
+    _socket!.onReconnect((_) {
+      debugPrint('NET connect#$id reconnected');
+    });
+    _socket!.onReconnectAttempt((_) {
+      debugPrint('NET connect#$id reconnect attempt');
     });
     _socket!.onConnectError((data) {
       _connecting = false;

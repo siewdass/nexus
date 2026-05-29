@@ -30,10 +30,6 @@ class SttService {
         }
       },
     );
-    if (_initialized) {
-      final locales = await _speech!.locales();
-      debugPrint('[STT] locales: ${locales.map((l) => l.localeId).toList()}');
-    }
     return _initialized;
   }
 

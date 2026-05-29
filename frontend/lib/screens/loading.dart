@@ -21,26 +21,35 @@ class _LoadingScreenState extends State<LoadingScreen> {
   }
 
   Future<void> _startScan() async {
-    final result = await Scanner.discover(timeout: const Duration(seconds: 3));
-    if (!mounted) return;
-
-    if (result != null) {
-      setState(() {
-        _message = 'Servidor encontrado: ${result.private}';
-        _done = true;
-      });
-      await Future.delayed(const Duration(milliseconds: 2000));
+    for (int i = 0; i < 5; i++) {
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Home()),
-      );
-    } else {
-      setState(() {
-        _message = 'No se encontró el servidor Nexus';
-        _done = true;
-      });
+      setState(() => _message = 'Buscando servidor Nexus... (intento ${i + 1}/5)');
+      final result =
+          await Scanner.discover(timeout: const Duration(seconds: 2));
+      if (!mounted) return;
+
+      if (result != null) {
+        setState(() {
+          _message = 'Servidor encontrado: ${result.private}';
+          _done = true;
+        });
+        await Future.delayed(const Duration(milliseconds: 2000));
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const Home()),
+        );
+        return;
+      }
+
+      if (i < 4) await Future.delayed(const Duration(seconds: 2));
     }
+
+    if (!mounted) return;
+    setState(() {
+      _message = 'No se encontró el servidor Nexus';
+      _done = true;
+    });
   }
 
   @override

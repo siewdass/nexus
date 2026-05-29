@@ -36,26 +36,15 @@ class NetworkService {
     _socket = io.io('http://$host:$port', <String, dynamic>{
       'transports': ['websocket'],
       'reconnection': false,
-      'forceNew': true,
     });
 
     final completer = Completer<void>();
-    var firstConnect = true;
     _socket!.onConnect((_) {
-      if (firstConnect) {
-        firstConnect = false;
-        debugPrint('NET connect#$id connected');
-      }
+      debugPrint('NET connect#$id connected');
       if (!completer.isCompleted) completer.complete();
     });
     _socket!.onDisconnect((_) {
       debugPrint('NET connect#$id disconnected');
-    });
-    _socket!.onReconnect((_) {
-      debugPrint('NET connect#$id reconnected');
-    });
-    _socket!.onReconnectAttempt((_) {
-      debugPrint('NET connect#$id reconnect attempt');
     });
     _socket!.onConnectError((data) {
       _connecting = false;

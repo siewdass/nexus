@@ -4,12 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:provider/provider.dart';
 import '../services/notifications.dart';
 import '../services/wake.dart';
 import '../services/tts.dart';
 import '../services/network.dart';
 import '../services/scanner.dart';
 import '../services/stt.dart';
+import '../services/theme_service.dart';
+import 'settings.dart';
 
 class _Interaction {
   String query;
@@ -320,41 +323,58 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nexus'),
-        backgroundColor: _nexusDetected ? Colors.orange : Colors.blue,
-        actions: const [],
+    final theme = context.watch<ThemeService>();
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: theme.sidebarBg,
+        statusBarIconBrightness:
+            theme.isDark ? Brightness.light : Brightness.dark,
       ),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Nexus'),
+          backgroundColor: theme.sidebarBg,
+          foregroundColor: theme.primaryText,
+          actions: [
+            IconButton(
+              icon: Icon(Icons.settings, color: theme.primaryText),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              ),
+            ),
+          ],
+        ),
       floatingActionButton: FloatingActionButton(
         onPressed: _toggleListening,
-        backgroundColor: _listening ? Colors.red : Colors.green,
+        backgroundColor: _listening
+            ? context.watch<ThemeService>().green
+            : context.watch<ThemeService>().inactiveBg,
         child: _isStarting
-            ? const SizedBox(
+            ? SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  valueColor: AlwaysStoppedAnimation<Color>(theme.primaryText),
                 ),
               )
             : Icon(
                 _listening ? Icons.stop : Icons.play_arrow,
                 size: 28,
+                color: theme.primaryText,
               ),
       ),
       body: _interactions.isEmpty && !_modelsReady
           ? const Center(
-              child: Text(
-                'Nexus',
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-              ),
+              child: Icon(Icons.smart_toy, size: 80),
             )
           : _interactions.isEmpty
-              ? const Center(
-                  child: Text(
-                    'Nexus',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+              ? Center(
+                  child: Icon(
+                    Icons.smart_toy,
+                    size: 80,
+                    color: context.watch<ThemeService>().primaryText,
                   ),
                 )
               : ListView.builder(
@@ -378,7 +398,8 @@ class _HomeState extends State<Home> {
                     );
                   },
                   ),
-      );
+      ),
+    );
     }  // build
 }  // _HomeState
 
@@ -397,6 +418,7 @@ class _TextCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeService>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -404,7 +426,7 @@ class _TextCard extends StatelessWidget {
           text,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[700],
+            color: theme.primaryText,
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -416,8 +438,7 @@ class _TextCard extends StatelessWidget {
               onTap: () => Clipboard.setData(ClipboardData(text: text)),
               child: Padding(
                 padding: const EdgeInsets.all(2),
-                child:
-                    Icon(Icons.content_copy, size: 14, color: Colors.grey[600]),
+                child: Icon(Icons.content_copy, size: 14, color: theme.secondaryText),
               ),
             ),
             if (onPlay != null)
@@ -435,7 +456,7 @@ class _TextCard extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.all(2),
                         child: Icon(Icons.volume_up,
-                            size: 14, color: Colors.grey[600]),
+                            size: 14, color: theme.secondaryText),
                       ),
                     ),
             if (trailing != null) const SizedBox(width: 4),
@@ -466,6 +487,7 @@ class _InteractionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeService>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -478,7 +500,7 @@ class _InteractionCard extends StatelessWidget {
                 interaction.query,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: theme.secondaryText,
                   fontStyle: FontStyle.italic,
                 ),
                 ),
@@ -491,7 +513,7 @@ class _InteractionCard extends StatelessWidget {
             interaction.think,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[700],
+              color: theme.primaryText,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -511,7 +533,7 @@ class _InteractionCard extends StatelessWidget {
             interaction.think,
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[700],
+              color: theme.primaryText,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -532,7 +554,7 @@ class _InteractionCard extends StatelessWidget {
                               ? Icons.visibility_off
                               : Icons.visibility,
                           size: 14,
-                          color: Colors.grey[600],
+                          color: theme.secondaryText,
                         ),
                       ),
                     ),

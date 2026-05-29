@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:provider/provider.dart';
 import 'services/notifications.dart';
+import 'services/theme_service.dart';
 import 'screens/loading.dart';
 
 Future<void> main() async {
@@ -9,7 +11,21 @@ Future<void> main() async {
   await initNotifications();
   await _initBackgroundService();
 
-  runApp(const MaterialApp(home: LoadingScreen()));
+  final theme = ThemeService();
+  await theme.load();
+
+  runApp(
+    ChangeNotifierProvider.value(
+      value: theme,
+      child: Consumer<ThemeService>(
+        builder: (_, themeService, __) => MaterialApp(
+          theme: themeService.currentTheme,
+          home: const LoadingScreen(),
+          debugShowCheckedModeBanner: false,
+        ),
+      ),
+    ),
+  );
 }
 
 Future<void> _initBackgroundService() async {

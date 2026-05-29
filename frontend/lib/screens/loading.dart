@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/scanner.dart';
+import '../services/theme_service.dart';
 import 'home.dart';
 
 class LoadingScreen extends StatefulWidget {
@@ -54,28 +56,29 @@ class _LoadingScreenState extends State<LoadingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeService>();
     return Scaffold(
-      backgroundColor: Colors.blue,
+      backgroundColor: theme.scaffoldBg,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.smart_toy, size: 80, color: Colors.white),
+            Icon(Icons.smart_toy, size: 80, color: theme.primaryText),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Nexus',
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: theme.primaryText,
               ),
             ),
             const SizedBox(height: 40),
-            if (!_done) const CircularProgressIndicator(color: Colors.white),
+            if (!_done) CircularProgressIndicator(color: theme.primaryText),
             if (!_done) const SizedBox(height: 16),
             Text(
               _message,
-              style: const TextStyle(fontSize: 16, color: Colors.white70),
+              style: TextStyle(fontSize: 16, color: theme.secondaryText),
               textAlign: TextAlign.center,
             ),
             if (_done && Scanner.lastResult == null) ...[
@@ -88,6 +91,10 @@ class _LoadingScreenState extends State<LoadingScreen> {
                   });
                   _startScan();
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.green,
+                  foregroundColor: Colors.white,
+                ),
                 child: const Text('Reintentar'),
               ),
             ],

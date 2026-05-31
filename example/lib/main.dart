@@ -1,12 +1,11 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
-late MenuItem _toggleItem;
-late Menu _trayMenu;
+import 'screens/home.dart';
+import 'services/tray_service.dart';
+
+final trayService = TrayService();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,64 +29,28 @@ void main() async {
   }
 
   await windowManager.setPreventClose(true);
+  await trayService.init();
 
-  _toggleItem = MenuItem(key: 'toggle', label: 'Show');
-  _toggleItem.onClick = (_) => _onToggle();
-  _trayMenu = Menu(
-    items: [
-      _toggleItem,
-      MenuItem(key: 'dummy', label: 'Dummy', disabled: true),
-      MenuItem.separator(),
-      MenuItem(
-        key: 'quit',
-        label: 'Exit',
-        onClick: (_) {
-          windowManager.destroy();
-          trayManager.destroy();
-          exit(0);
-        },
-      ),
-    ],
-  );
-
-  await trayManager.setIcon('assets/icon.png', isTemplate: true);
-  await trayManager.setToolTip('Nexus Hub');
-  await trayManager.setContextMenu(_trayMenu);
-
-  runApp(const MyApp());
+  runApp(const Hub());
 }
 
-void _onToggle() async {
-  if (await windowManager.isVisible()) {
-    windowManager.hide();
-    _toggleItem.label = 'Show';
-  } else {
-    windowManager.show();
-    windowManager.focus();
-    _toggleItem.label = 'Hide';
-  }
-  await trayManager.setContextMenu(_trayMenu);
-}
-
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+class Hub extends StatefulWidget {
+  const Hub({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  State<Hub> createState() => _HubState();
 }
 
-class _MyAppState extends State<MyApp> with WindowListener, TrayListener {
+class _HubState extends State<Hub> with WindowListener {
   @override
   void initState() {
     super.initState();
     windowManager.addListener(this);
-    trayManager.addListener(this);
   }
 
   @override
   void dispose() {
     windowManager.removeListener(this);
-    trayManager.removeListener(this);
     super.dispose();
   }
 
@@ -97,62 +60,10 @@ class _MyAppState extends State<MyApp> with WindowListener, TrayListener {
   }
 
   @override
-  void onTrayIconMouseDown() {
-    trayManager.popUpContextMenu();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return const MaterialApp(debugShowCheckedModeBanner: false, home: _Home());
-  }
-}
-
-class _Home extends StatelessWidget {
-  const _Home();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
-      body: Column(
-        children: [
-          DragToMoveArea(
-            child: Container(
-              height: 35,
-              color: const Color(0xFF16213E),
-              alignment: Alignment.center,
-              child: Stack(
-                children: [
-                  const Center(
-                    child: Text(
-                      'Nexus Hub',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 12,
-                    top: 0,
-                    bottom: 0,
-                    child: Icon(Icons.settings, color: Colors.white, size: 18),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const Expanded(
-            child: Center(
-              child: Text(
-                'Custom window',
-                style: TextStyle(color: Colors.white70, fontSize: 16),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: HomeScreen(),
     );
   }
 }

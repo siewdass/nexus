@@ -1,4 +1,4 @@
-## Backend
+## Hub
 
 Servidor Dart que corre un LLM local (Qwen3-0.6B) vía llama.cpp con aceleración Metal.
 
@@ -14,19 +14,19 @@ Servidor Dart que corre un LLM local (Qwen3-0.6B) vía llama.cpp con aceleració
 ### Development
 
 ```sh
-./backend.sh
+./desktop.sh
 ```
 
 ### Build
 
 ```sh
-cd backend
+cd hub
 dart compile exe lib/main.dart -o nexus.bin
 ```
 
-## Frontend
+## Link
 
-App Flutter Android offline voice first.
+App Flutter Mobile offline voice first.
 
 ### Features
 
@@ -46,20 +46,9 @@ App Flutter Android offline voice first.
 - **Home** — Detección de wake word, historial de conversaciones, FAB para iniciar/parar
 - **Settings** — Switch de modo oscuro, persiste en SharedPreferences
 
-### Temas
-
-| Elemento | Claro (default) | Oscuro |
-|---|---|---|
-| Fondo | `#BAC7D5` | `#1A222D` |
-| AppBar | `#A5B6C9` | `#222B38` |
-| Botón activo | `#34B77A` | `#34B77A` |
-| Botones inactivos | `#DAE2EB` | `#303A4A` |
-| Texto principal | `#4A5560` | `#F0F4F8` |
-| Texto secundario | `#73808E` | `#A0B2C0` |
-| Switch activo | `#5AC88C` | `#42BD82` |
-
 ### Permisos
 
+- `INTERNET` / `ACCESS_NETWORK_STATE` — conexión Socket.IO y descubrimiento UDP
 - `RECORD_AUDIO` — capturar audio del micrófono
 - `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_MICROPHONE` — servicio en segundo plano
 - `POST_NOTIFICATIONS` — notificaciones al detectar wake word
@@ -68,12 +57,12 @@ App Flutter Android offline voice first.
 ### Development
 
 ```sh
-./frontend.sh
+./mobile.sh
 ```
 
 ### Build
 
 ```sh
-cd frontend
+cd link
 flutter build apk --target-platform android-arm64
 ```

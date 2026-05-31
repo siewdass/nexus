@@ -8,8 +8,11 @@ import 'package:socket_io_plus/socket_io.dart';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'package:provider/provider.dart';
 import 'screens/home.dart';
+import 'screens/settings.dart';
 import 'services/status.dart';
+import 'services/theme_service.dart';
 import 'services/tray_service.dart';
 
 final trayService = TrayService();
@@ -244,7 +247,7 @@ void main() {
     try {
       final tunnel = await Process.start(
         tunnelBin.path,
-        ['tunnel', '--url', 'http://localhost:5001'],
+        ['tunnel', '--url', 'http://localhost:5001', '--edge-ip-version', '4', '--no-autoupdate', '--retries', '1'],
       );
       tunnel.stderr.transform(utf8.decoder).listen((line) {
         final match =
@@ -278,7 +281,15 @@ void main() {
   await windowManager.setPreventClose(true);
   await trayService.init();
 
-  runApp(const Hub());
+  final theme = ThemeService();
+  await theme.load();
+
+  runApp(
+    ChangeNotifierProvider.value(
+      value: theme,
+      child: const Hub(),
+    ),
+  );
 
   if (!kReleaseMode) {
     await windowManager.show();
@@ -316,9 +327,12 @@ class _HubState extends State<Hub> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: HomeScreen(),
+    return Consumer<ThemeService>(
+      builder: (_, theme, __) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: theme.currentTheme,
+        home: const HomeScreen(),
+      ),
     );
   }
 }

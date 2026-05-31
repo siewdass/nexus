@@ -10,10 +10,10 @@ import 'package:window_manager/window_manager.dart';
 
 import 'package:provider/provider.dart';
 import 'screens/home.dart';
-import 'screens/settings.dart';
 import 'services/status.dart';
 import 'services/theme_service.dart';
 import 'services/tray_service.dart';
+import 'services/llm_service.dart';
 
 final trayService = TrayService();
 
@@ -41,28 +41,6 @@ Future<String> extractAsset(String asset) async {
   }
   print('Extraido ${file.path}');
   return file.path;
-}
-
-class LlmService {
-  LlamaEngine? _engine;
-
-  LlamaEngine? get engine => _engine;
-
-  Future<void> init({String? bundleAssets}) async {
-    final dylib = bundleAssets != null
-        ? '$bundleAssets/libllama.dylib'
-        : await extractAsset('assets/libllama.dylib');
-    final model = bundleAssets != null
-        ? '$bundleAssets/Qwen3-0.6B-Q8_0.gguf'
-        : await extractAsset('assets/Qwen3-0.6B-Q8_0.gguf');
-    LlamaLibrary.load(path: dylib);
-    LlamaLog.captureToFile('/dev/null');
-    _engine = await LlamaEngine.spawn(
-      libraryPath: dylib,
-      modelParams: ModelParams(path: model, gpuLayers: 99),
-      contextParams: const ContextParams(nCtx: 4096),
-    );
-  }
 }
 
 String? _localIp;
@@ -124,9 +102,14 @@ void main() {
     _bundleAssets = _findBundleAssets();
 
     // Inicializar LLM antes de Flutter para que Metal sea de llama.cpp
-    final llm = LlmService();
     try {
-      await llm.init(bundleAssets: _bundleAssets);
+      final dylib = _bundleAssets != null
+          ? '$_bundleAssets/libllama.dylib'
+          : await extractAsset('assets/libllama.dylib');
+      final model = _bundleAssets != null
+          ? '$_bundleAssets/Qwen3-0.6B-Q8_0.gguf'
+          : await extractAsset('assets/Qwen3-0.6B-Q8_0.gguf');
+      await llmService.init(dylibPath: dylib, modelPath: model);
       serviceStatus.setLlmReady();
       print('LLM listo.');
     } catch (e, st) {
@@ -186,7 +169,7 @@ void main() {
     print('Cliente conectado: ${client.id}');
 
     client.on('chat', (data) async {
-      if (llm.engine == null) {
+      if (llmService.engine == null) {
         client.emit('error', 'Engine no inicializado');
         return;
       }
@@ -198,7 +181,7 @@ void main() {
       }
 
       try {
-        final chat = await llm.engine!.createChat();
+        final chat = await llmService.engine!.createChat();
         chat.addSystem('Eres un asistente breve y conciso. Responde en espanol.');
         chat.addUser(text);
 

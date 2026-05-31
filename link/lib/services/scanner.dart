@@ -10,8 +10,8 @@ class ScanResult {
   ScanResult({required this.private, required this.public});
 
   factory ScanResult.fromJson(Map<String, dynamic> json) => ScanResult(
-        private: json['private'] as String,
-        public: json['public'] as String,
+        private: (json['private'] as String?) ?? '',
+        public: (json['public'] as String?) ?? '',
       );
 }
 

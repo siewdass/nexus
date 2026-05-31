@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 
-import '../services/status.dart';
 import '../services/theme_service.dart';
+import '../services/llm_service.dart';
 import '../widgets/system_stats.dart';
+import '../widgets/chat.dart';
 import 'settings.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,6 +19,27 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _showSettings = false;
+
+  Stream<String> _onChat(String text) async* {
+    if (llmService.engine == null) {
+      yield 'LLM no disponible';
+      return;
+    }
+    try {
+      final chat = await llmService.engine!.createChat();
+      chat.addSystem('Eres un asistente breve y conciso. Responde en espanol.');
+      chat.addUser(text);
+      await for (final event in chat.generate(sampler: const SamplerParams(temperature: 0.7, topP: 0.9), maxTokens: 4096)) {
+        if (event is TokenEvent) {
+          yield event.text;
+        }
+      }
+    } catch (e, st) {
+      print('Error en chat: $e');
+      print(st);
+      yield 'Error: $e';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,11 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Center(
                       child: Text(
                         _showSettings ? 'Nexus Hub - Settings' : 'Nexus Hub',
-                        style: TextStyle(
-                          color: theme.primaryText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyle(color: theme.primaryText, fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
@@ -56,8 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Icon(Icons.settings, color: theme.primaryText, size: 18),
                       ),
                     ),
-                  if (_showSettings)
-                    const SizedBox(width: 18 + 12),
+                  if (_showSettings) const SizedBox(width: 18 + 12),
                 ],
               ),
             ),
@@ -65,82 +84,25 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: _showSettings
                 ? const SettingsBody()
-                : ListenableBuilder(
-                    listenable: serviceStatus,
-                    builder: (context, _) {
-                      final s = serviceStatus;
-                      return SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                _dot(theme, 'Agent', s.llm),
-                                const SizedBox(width: 16),
-                                _dot(theme, 'Networking', s.server),
-                                const SizedBox(width: 16),
-                                _dot(theme, 'Discovery', s.udp),
-                                const SizedBox(width: 16),
-                                _dot(theme, 'Tunnel', s.tunnel),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            if (s.private.isNotEmpty)
-                              Text('Private: ${s.private}:5001',
-                                  style: TextStyle(color: theme.secondaryText, fontSize: 12)),
-                            if (s.publicUrl.isNotEmpty)
-                              Text('Public: ${s.publicUrl}',
-                                  style: TextStyle(color: theme.secondaryText, fontSize: 12)),
-                            if (s.error != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(s.error!,
-                                    style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
-                              ),
-                          ],
-                        ),
-                      );
-                    },
+                : ChatWidget(
+                    header: Container(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      color: theme.scaffoldBg,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SystemStats(),
+                          const SizedBox(height: 8),
+                          Divider(height: 1, color: theme.inactiveBg),
+                          const SizedBox(height: 4),
+                        ],
+                      ),
+                    ),
+                    onSend: _onChat,
                   ),
           ),
-          if (!_showSettings)
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              color: theme.scaffoldBg,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Divider(height: 1, color: theme.inactiveBg),
-                  const SizedBox(height: 8),
-                  const SystemStats(),
-                ],
-              ),
-            ),
         ],
       ),
-    );
-  }
-
-  Widget _dot(ThemeService theme, String label, ServiceState state) {
-    final icon = switch (state) {
-      ServiceState.starting => Icons.sync,
-      ServiceState.ready => Icons.check_circle,
-      ServiceState.error => Icons.error,
-    };
-    final color = switch (state) {
-      ServiceState.starting => Colors.yellowAccent,
-      ServiceState.ready => Colors.greenAccent,
-      ServiceState.error => Colors.redAccent,
-    };
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 12),
-        const SizedBox(width: 4),
-        Text(label,
-            style: TextStyle(color: theme.primaryText, fontSize: 11)),
-      ],
     );
   }
 }

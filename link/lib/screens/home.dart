@@ -85,11 +85,19 @@ class _HomeState extends State<Home> {
     _recording = false;
   }
 
+  Future<void> _connect(ScanResult scan) async {
+    if (scan.public.isNotEmpty) {
+      await networkService.connect(host: scan.public, port: 443);
+    } else {
+      await networkService.connect(host: scan.private, port: 5001);
+    }
+  }
+
   Future<void> _tryReconnect() async {
     final scan = await Scanner.discover(timeout: const Duration(seconds: 2));
     if (scan != null && mounted) {
       try {
-        await networkService.connect(host: scan.private, port: 5001);
+        await _connect(scan);
       } catch (_) {}
     }
   }
@@ -110,7 +118,7 @@ class _HomeState extends State<Home> {
         final scan = Scanner.lastResult;
         if (scan != null) {
           try {
-            await networkService.connect(host: scan.private, port: 5001);
+            await _connect(scan);
           } catch (_) {}
         }
       }
@@ -146,7 +154,7 @@ class _HomeState extends State<Home> {
           return;
         }
         try {
-          await networkService.connect(host: scan.private, port: 5001);
+          await _connect(scan);
         } catch (e) {
           interaction.response = 'Error de conexión';
           _finishConversation();

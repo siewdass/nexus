@@ -35,7 +35,8 @@ class NetworkService extends ChangeNotifier {
     _socket?.disconnect();
     _socket?.clearListeners();
 
-    _socket = io.io('http://$host:$port', <String, dynamic>{
+    final scheme = port == 443 ? 'https' : 'http';
+    _socket = io.io('$scheme://$host:$port', <String, dynamic>{
       'transports': ['websocket'],
       'reconnection': false,
     });

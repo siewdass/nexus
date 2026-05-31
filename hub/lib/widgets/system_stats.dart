@@ -127,20 +127,22 @@ class _SystemStatsState extends State<SystemStats>
     final theme = context.watch<ThemeService>();
     return Row(
       children: [
-        _bar(theme, 'CPU', _cpu, _cpuTarget),
+        _bar(theme, Icons.memory, 'CPU', _cpu, _cpuTarget),
         const SizedBox(width: 8),
-        _bar(theme, 'RAM', _mem, _memTarget),
+        _bar(theme, Icons.developer_board, 'RAM', _mem, _memTarget),
         const SizedBox(width: 8),
-        _bar(theme, 'Disk', _disk, _diskTarget),
+        _bar(theme, Icons.storage, 'DISK', _disk, _diskTarget),
       ],
     );
   }
 
-  Widget _bar(ThemeService theme, String label, double pct, double target) {
+  Widget _bar(ThemeService theme, IconData icon, String label, double pct, double target) {
     final color = target > 80 ? Colors.redAccent : (target > 50 ? Colors.orangeAccent : Colors.greenAccent);
     return Expanded(
       child: Row(
         children: [
+          Icon(icon, color: theme.secondaryText, size: 10),
+          const SizedBox(width: 2),
           Text('$label ${target.toStringAsFixed(0).padLeft(2, '0')}%',
               style: TextStyle(color: theme.primaryText, fontSize: 9)),
           const SizedBox(width: 4),

@@ -1,4 +1,8 @@
 {
+  "dart.lineLength": 150,
+  "[dart]": {
+    "editor.rulers": [150]
+  },
   "files.exclude": {
     ".dart_tool": true,
     "**/.build/": true,
@@ -16,7 +20,7 @@
     "**/.packages": true,
     "**/*.g.dart": false,
     "**/*.freezed.dart": false,
-    ".vscode": true,
+    ".vscode": true
   },
   "search.exclude": {
     ".dart_tool": true,

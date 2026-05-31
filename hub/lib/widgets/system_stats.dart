@@ -125,52 +125,42 @@ class _SystemStatsState extends State<SystemStats>
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeService>();
-    return Column(
+    return Row(
       children: [
-        const SizedBox(height: 16),
-        _bar(theme, Icons.memory, 'CPU', _cpu, _cpuTarget),
-        const SizedBox(height: 8),
-        _bar(theme, Icons.developer_board, 'RAM', _mem, _memTarget),
-        const SizedBox(height: 8),
-        _bar(theme, Icons.storage, 'Disk', _disk, _diskTarget),
+        _bar(theme, 'CPU', _cpu, _cpuTarget),
+        const SizedBox(width: 8),
+        _bar(theme, 'RAM', _mem, _memTarget),
+        const SizedBox(width: 8),
+        _bar(theme, 'Disk', _disk, _diskTarget),
       ],
     );
   }
 
-  Widget _bar(ThemeService theme, IconData icon, String label, double pct, double target) {
+  Widget _bar(ThemeService theme, String label, double pct, double target) {
     final color = target > 80 ? Colors.redAccent : (target > 50 ? Colors.orangeAccent : Colors.greenAccent);
-    return Row(
-      children: [
-        Icon(icon, color: theme.secondaryText, size: 14),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 40,
-          child: Text(label,
-              style: TextStyle(color: theme.primaryText, fontSize: 12)),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: AnimatedBuilder(
-            animation: _animCtrl,
-            builder: (context, _) {
-              final t = Curves.easeInOut.transform(_animCtrl.value);
-              final value = (pct + (target - pct) * t) / 100;
-              return LinearProgressIndicator(
-                value: value,
-                color: color,
-                backgroundColor: theme.inactiveBg,
-                minHeight: 6,
-              );
-            },
+    return Expanded(
+      child: Row(
+        children: [
+          Text('$label ${target.toStringAsFixed(0).padLeft(2, '0')}%',
+              style: TextStyle(color: theme.primaryText, fontSize: 9)),
+          const SizedBox(width: 4),
+          Expanded(
+            child: AnimatedBuilder(
+              animation: _animCtrl,
+              builder: (context, _) {
+                final t = Curves.easeInOut.transform(_animCtrl.value);
+                final value = (pct + (target - pct) * t) / 100;
+                return LinearProgressIndicator(
+                  value: value,
+                  color: color,
+                  backgroundColor: theme.inactiveBg,
+                  minHeight: 5,
+                );
+              },
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 36,
-          child: Text('${target.toStringAsFixed(0).padLeft(2, '0')}%',
-              style: TextStyle(color: theme.primaryText, fontSize: 11)),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -138,7 +138,7 @@ void main() {
     WidgetsFlutterBinding.ensureInitialized();
 
   _localIp = await _findLocalIp();
-  serviceStatus.setPrivateIp(_localIp ?? '?');
+  serviceStatus.setPrivate(_localIp ?? '?');
   _startUdpDiscovery();
   serviceStatus.setUdpReady();
 

@@ -70,20 +70,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     builder: (context, _) {
                       final s = serviceStatus;
                       return SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
+                        padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _row(theme, 'LLM', s.llm),
-                            const SizedBox(height: 8),
-                            _row(theme, 'Server', s.server),
-                            const SizedBox(height: 8),
-                            _row(theme, 'UDP', s.udp),
-                            const SizedBox(height: 8),
-                            _row(theme, 'Tunnel', s.tunnel),
+                            Row(
+                              children: [
+                                _dot(theme, 'Agent', s.llm),
+                                const SizedBox(width: 16),
+                                _dot(theme, 'Networking', s.server),
+                                const SizedBox(width: 16),
+                                _dot(theme, 'Discovery', s.udp),
+                                const SizedBox(width: 16),
+                                _dot(theme, 'Tunnel', s.tunnel),
+                              ],
+                            ),
                             const SizedBox(height: 16),
-                            if (s.privateIp.isNotEmpty)
-                              Text('IP: ${s.privateIp}:5001',
+                            if (s.private.isNotEmpty)
+                              Text('Private: ${s.private}:5001',
                                   style: TextStyle(color: theme.secondaryText, fontSize: 12)),
                             if (s.publicUrl.isNotEmpty)
                               Text('Public: ${s.publicUrl}',
@@ -102,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           if (!_showSettings)
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 0, 8, 12),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               color: theme.scaffoldBg,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -118,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _row(ThemeService theme, String label, ServiceState state) {
+  Widget _dot(ThemeService theme, String label, ServiceState state) {
     final icon = switch (state) {
       ServiceState.starting => Icons.sync,
       ServiceState.ready => Icons.check_circle,
@@ -130,14 +134,12 @@ class _HomeScreenState extends State<HomeScreen> {
       ServiceState.error => Colors.redAccent,
     };
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 14),
-        const SizedBox(width: 8),
+        Icon(icon, color: color, size: 12),
+        const SizedBox(width: 4),
         Text(label,
-            style: TextStyle(color: theme.primaryText, fontSize: 13)),
-        const Spacer(),
-        Text(state.name,
-            style: TextStyle(color: color, fontSize: 12)),
+            style: TextStyle(color: theme.primaryText, fontSize: 11)),
       ],
     );
   }

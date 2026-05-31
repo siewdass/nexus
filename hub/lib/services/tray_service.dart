@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 class TrayService with TrayListener {
   late final MenuItem _toggleItem;
   late final Menu _menu;
+  bool _isShown = false;
 
   Future<void> init() async {
     _toggleItem = MenuItem(key: 'toggle', label: 'Show');
@@ -43,13 +44,15 @@ class TrayService with TrayListener {
   }
 
   Future<void> _onToggle() async {
-    if (await windowManager.isVisible()) {
-      windowManager.hide();
+    if (_isShown) {
+      await windowManager.hide();
       _toggleItem.label = 'Show';
+      _isShown = false;
     } else {
-      windowManager.show();
-      windowManager.focus();
+      await windowManager.show();
+      await windowManager.focus();
       _toggleItem.label = 'Hide';
+      _isShown = true;
     }
     await trayManager.setContextMenu(_menu);
   }

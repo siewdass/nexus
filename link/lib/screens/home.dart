@@ -36,6 +36,7 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   final _detector = WakeService();
   StreamSubscription<AudioDataContainer>? _audioStream;
+  StreamSubscription<void>? _disconnectSub;
   final _bgService = FlutterBackgroundService();
 
   final List<_Interaction> _interactions = [];
@@ -84,9 +85,22 @@ class _HomeState extends State<Home> {
     _recording = false;
   }
 
+  Future<void> _tryReconnect() async {
+    final scan = await Scanner.discover(timeout: const Duration(seconds: 2));
+    if (scan != null && mounted) {
+      try {
+        await networkService.connect(host: scan.private, port: 5001);
+      } catch (_) {}
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+
+    _disconnectSub = networkService.onDisconnect.listen((_) {
+      _tryReconnect();
+    });
 
     _detector.onReady = () async {
       await _tts.init();
@@ -318,6 +332,7 @@ class _HomeState extends State<Home> {
     _stopStt();
     _stopRecorder();
     _detector.dispose();
+    _disconnectSub?.cancel();
     super.dispose();
   }
 
@@ -350,39 +365,41 @@ class _HomeState extends State<Home> {
         onPressed: _toggleListening,
         theme: theme,
       ),
-      body: _interactions.isEmpty && !_modelsReady
-          ? const Center(
-              child: Icon(Icons.smart_toy, size: 80),
-            )
-          : _interactions.isEmpty
-              ? Center(
-                  child: Icon(
-                    Icons.smart_toy,
-                    size: 80,
-                    color: theme.primaryText,
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _interactions.length,
-                  itemBuilder: (context, index) {
-                    final item = _interactions[index];
-                    final isLast = index == _interactions.length - 1;
-                    return _InteractionCard(
-                      interaction: item,
-                      isActive: isLast && _nexusDetected,
-                      isSpeaking: _speakingIndex == index,
-                      isThinkExpanded: _expandedThinkIndex == index,
-                      onToggleThink: () {
-                        setState(() {
-                          _expandedThinkIndex =
-                              _expandedThinkIndex == index ? null : index;
-                        });
-                      },
-                      onPlay: () => _speakResponse(index, item.response),
-                    );
-                  },
-                  ),
+      body: Column(
+        children: [
+          if (!context.watch<NetworkService>().isConnected)
+            const LinearProgressIndicator(minHeight: 2),
+          Expanded(
+            child: _interactions.isEmpty && !_modelsReady
+                ? const Center(child: Icon(Icons.smart_toy, size: 80))
+                : _interactions.isEmpty
+                    ? Center(
+                        child: Icon(Icons.smart_toy, size: 80, color: theme.primaryText),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _interactions.length,
+                        itemBuilder: (context, index) {
+                          final item = _interactions[index];
+                          final isLast = index == _interactions.length - 1;
+                          return _InteractionCard(
+                            interaction: item,
+                            isActive: isLast && _nexusDetected,
+                            isSpeaking: _speakingIndex == index,
+                            isThinkExpanded: _expandedThinkIndex == index,
+                            onToggleThink: () {
+                              setState(() {
+                                _expandedThinkIndex =
+                                    _expandedThinkIndex == index ? null : index;
+                              });
+                            },
+                            onPlay: () => _speakResponse(index, item.response),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
       );
     }  // build
 }  // _HomeState
@@ -540,13 +557,13 @@ class _InteractionCard extends StatelessWidget {
               fontStyle: FontStyle.italic,
             ),
           ),
-        if (isActive && interaction.response.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: SizedBox(
+        if (isActive && interaction.response.isEmpty && !context.watch<NetworkService>().isConnected)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: const SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange),
             ),
           ),
         if (isThinkExpanded &&

@@ -4,6 +4,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:provider/provider.dart';
 import 'services/notifications.dart';
 import 'services/theme_service.dart';
+import 'services/network.dart';
 import 'screens/loading.dart';
 
 Future<void> main() async {
@@ -16,8 +17,11 @@ Future<void> main() async {
   await theme.load();
 
   runApp(
-    ChangeNotifierProvider.value(
-      value: theme,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: theme),
+        ChangeNotifierProvider.value(value: networkService),
+      ],
       child: Consumer<ThemeService>(
         builder: (_, themeService, __) => AnnotatedRegion<SystemUiOverlayStyle>(
           value: SystemUiOverlayStyle(

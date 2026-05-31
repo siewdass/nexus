@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
-class NetworkService {
+class NetworkService extends ChangeNotifier {
   io.Socket? _socket;
   bool _connecting = false;
   int _connectCount = 0;
@@ -10,11 +10,13 @@ class NetworkService {
   final _thinkController = StreamController<String>.broadcast();
   final _doneController = StreamController<void>.broadcast();
   final _errorController = StreamController<String>.broadcast();
+  final _disconnectController = StreamController<void>.broadcast();
 
   Stream<String> get tokens => _tokenController.stream;
   Stream<String> get think => _thinkController.stream;
   Stream<void> get done => _doneController.stream;
   Stream<String> get errors => _errorController.stream;
+  Stream<void> get onDisconnect => _disconnectController.stream;
 
   bool get isConnected => _socket?.connected ?? false;
 
@@ -41,10 +43,13 @@ class NetworkService {
     final completer = Completer<void>();
     _socket!.onConnect((_) {
       debugPrint('NET connect#$id connected');
+      notifyListeners();
       if (!completer.isCompleted) completer.complete();
     });
     _socket!.onDisconnect((_) {
       debugPrint('NET connect#$id disconnected');
+      _disconnectController.add(null);
+      notifyListeners();
     });
     _socket!.onConnectError((data) {
       _connecting = false;
@@ -90,6 +95,7 @@ class NetworkService {
     _thinkController.close();
     _doneController.close();
     _errorController.close();
+    _disconnectController.close();
   }
 }
 

@@ -10,15 +10,23 @@ class SettingsBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeService>();
     return Padding(
-      padding: const EdgeInsets.all(16),
-      child: SwitchListTile(
-        title: Text('Tema',
-            style: TextStyle(color: theme.primaryText)),
-        subtitle: Text('Claro / Oscuro',
-            style: TextStyle(color: theme.secondaryText)),
-        value: theme.isDark,
-        activeTrackColor: theme.green,
-        onChanged: (_) => theme.toggle(),
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Card(
+            color: theme.inactiveBg,
+            child: SwitchListTile(
+              title: Text('Theme',
+                  style: TextStyle(color: theme.primaryText)),
+              subtitle: Text('Switch between Light and Dark mode',
+                  style: TextStyle(color: theme.secondaryText)),
+              value: theme.isDark,
+              activeTrackColor: theme.green,
+              onChanged: (_) => theme.toggle(),
+            ),
+          ),
+        ],
       ),
     );
   }

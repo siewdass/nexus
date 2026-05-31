@@ -4,6 +4,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../services/status.dart';
 import '../services/theme_service.dart';
+import '../widgets/system_stats.dart';
 import 'settings.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -69,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     builder: (context, _) {
                       final s = serviceStatus;
                       return SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -99,6 +100,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
           ),
+          if (!_showSettings)
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 0, 8, 12),
+              color: theme.scaffoldBg,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Divider(height: 1, color: theme.inactiveBg),
+                  const SizedBox(height: 8),
+                  const SystemStats(),
+                ],
+              ),
+            ),
         ],
       ),
     );

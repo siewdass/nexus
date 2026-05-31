@@ -1,26 +1,38 @@
 PODS:
+  - disks_desktop (1.0.1):
+    - FlutterMacOS
   - FlutterMacOS (1.0.0)
   - screen_retriever_macos (0.0.1):
+    - FlutterMacOS
+  - system_monitor_kit (0.0.1):
     - FlutterMacOS
   - tray_manager (0.0.1):
     - FlutterMacOS
 
 DEPENDENCIES:
+  - disks_desktop (from `Flutter/ephemeral/.symlinks/plugins/disks_desktop/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - screen_retriever_macos (from `Flutter/ephemeral/.symlinks/plugins/screen_retriever_macos/macos`)
+  - system_monitor_kit (from `Flutter/ephemeral/.symlinks/plugins/system_monitor_kit/macos`)
   - tray_manager (from `Flutter/ephemeral/.symlinks/plugins/tray_manager/macos`)
 
 EXTERNAL SOURCES:
+  disks_desktop:
+    :path: Flutter/ephemeral/.symlinks/plugins/disks_desktop/macos
   FlutterMacOS:
     :path: Flutter/ephemeral
   screen_retriever_macos:
     :path: Flutter/ephemeral/.symlinks/plugins/screen_retriever_macos/macos
+  system_monitor_kit:
+    :path: Flutter/ephemeral/.symlinks/plugins/system_monitor_kit/macos
   tray_manager:
     :path: Flutter/ephemeral/.symlinks/plugins/tray_manager/macos
 
 SPEC CHECKSUMS:
+  disks_desktop: 923be3cfc98163842820668cefa42cb80523ba25
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   screen_retriever_macos: 452e51764a9e1cdb74b3c541238795849f21557f
+  system_monitor_kit: bf80ff8d7a8149cf9eb7c914ec4719ca4d4b0ceb
   tray_manager: a104b5c81b578d83f3c3d0f40a997c8b10810166
 
 PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009

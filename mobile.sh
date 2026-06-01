@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-cd "$(dirname "$0")/link" && flutter run "$@"
+clear && cd "$(dirname "$0")/link" && flutter run "$@"

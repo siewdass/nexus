@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:grpc/grpc.dart';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
@@ -12,55 +13,68 @@ class GrpcService extends NexusServiceBase {
   @override
   Stream<MessageResponse> message(
       ServiceCall call, MessageRequest request) async* {
-    if (llmService.engine == null) {
+    if (llmService.engine == null || llmService.modelConfig == null) {
       yield MessageResponse()..error = 'Engine no inicializado';
       return;
     }
     try {
-      final chat = await llmService.engine!.createChat();
-      chat.addSystem('Eres un asistente breve y conciso. Responde en espanol.');
-      chat.addUser(request.message);
+      final cfg = llmService.modelConfig!;
+      final prompt = cfg.promptFormat.build(cfg.systemPrompt, request.message);
+      final session = await llmService.engine!.createSession();
+      print('[LLM] modelo=${cfg.name} formato manual');
 
       var inThink = false;
       var buf = '';
 
-      await for (final event in chat.generate(
-        sampler: const SamplerParams(temperature: 0.7, topP: 0.9),
-        maxTokens: 4096,
+      await for (final event in session.generate(
+        prompt: prompt,
+        addSpecial: true,
+        parseSpecial: true,
+        sampler: cfg.sampler,
+        maxTokens: cfg.maxTokens,
       )) {
         if (event is TokenEvent) {
+          stdout.write(event.text);
+          stdout.flush();
           buf += event.text;
-          while (buf.isNotEmpty) {
-            if (!inThink) {
-              final idx = buf.indexOf('<think>');
-              if (idx < 0) {
-                yield MessageResponse()..reply = buf;
-                buf = '';
-                break;
+          if (cfg.thinkStart != null && cfg.thinkEnd != null) {
+            final startTag = cfg.thinkStart!;
+            final endTag = cfg.thinkEnd!;
+            while (buf.isNotEmpty) {
+              if (!inThink) {
+                final idx = buf.indexOf(startTag);
+                if (idx < 0) {
+                  yield MessageResponse()..reply = buf;
+                  buf = '';
+                  break;
+                }
+                if (idx > 0) {
+                  yield MessageResponse()..reply = buf.substring(0, idx);
+                }
+                buf = buf.substring(idx + startTag.length);
+                inThink = true;
+              } else {
+                final idx = buf.indexOf(endTag);
+                if (idx < 0) {
+                  yield MessageResponse()..think = buf;
+                  buf = '';
+                  break;
+                }
+                if (idx > 0) {
+                  yield MessageResponse()..think = buf.substring(0, idx);
+                }
+                buf = buf.substring(idx + endTag.length);
+                inThink = false;
               }
-              if (idx > 0) {
-                yield MessageResponse()..reply = buf.substring(0, idx);
-              }
-              buf = buf.substring(idx + 7);
-              inThink = true;
-            } else {
-              final idx = buf.indexOf('</think>');
-              if (idx < 0) {
-                yield MessageResponse()..think = buf;
-                buf = '';
-                break;
-              }
-              if (idx > 0) {
-                yield MessageResponse()..think = buf.substring(0, idx);
-              }
-              buf = buf.substring(idx + 8);
-              inThink = false;
             }
+          } else {
+            yield MessageResponse()..reply = buf;
+            buf = '';
           }
         }
       }
       if (buf.isNotEmpty) {
-        if (inThink) {
+        if (cfg.thinkStart != null && cfg.thinkEnd != null && inThink) {
           yield MessageResponse()..think = buf;
         } else {
           yield MessageResponse()..reply = buf;

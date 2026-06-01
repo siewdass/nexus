@@ -8,8 +8,6 @@ Caja de URL: Un campo con la URL pública activa de Cloudflare y un botón para 
 
 Rama de Git: Un texto que muestre el nombre de la branch activa en la que estás trabajando.
 
-Monitor de RAM/VRAM del modelo: Un medidor exclusivo de los GB de memoria ocupados por llama.cpp en la GPU con Metal.
-
 Métricas de hardware: Gráficos en tiempo real del uso general de CPU, GPU y Disco de la máquina.
 
 Barra de contexto segmentada: Una barra de progreso que divida el uso de los 16,384 tokens (Prompt de sistema, archivos inyectados, historial de chat y espacio libre).
@@ -49,3 +47,5 @@ Soporte MCP de terceros: Capacidad lógica para conectar, registrar y consumir h
 Pasar a foreground todo el servicio si es necesario para que pueda funcionar con la pantalla apagada
 
 Pasar a sherpa onxx STT o integrarlo como libreria despues de probar un ejemplo limpio en android mobile
+
+Reduccion de prompts eliminar temas repetidos en el prompt del usuario

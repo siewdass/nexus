@@ -47,4 +47,3 @@ app.*.map.json
 
 # External model & binaries
 **/*.gguf
-**/cloudflared

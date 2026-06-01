@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../services/theme_service.dart';
-import '../services/settings.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -11,7 +10,6 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeService>();
-    final settings = context.watch<SettingsService>();
     return Scaffold(
       backgroundColor: theme.scaffoldBg,
       body: Column(
@@ -58,19 +56,6 @@ class SettingsScreen extends StatelessWidget {
                       value: theme.isDark,
                       activeTrackColor: theme.green,
                       onChanged: (_) => theme.toggle(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Card(
-                    color: theme.inactiveBg,
-                    child: SwitchListTile(
-                      title: Text('Tunnel',
-                          style: TextStyle(color: theme.primaryText)),
-                      subtitle: Text('Cloudflare tunnel',
-                          style: TextStyle(color: theme.secondaryText)),
-                      value: settings.tunnel,
-                      activeTrackColor: theme.green,
-                      onChanged: (v) => settings.setTunnel(v),
                     ),
                   ),
                 ],

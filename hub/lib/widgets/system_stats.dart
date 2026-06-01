@@ -144,7 +144,7 @@ class _SystemStatsState extends State<SystemStats>
           Icon(icon, color: theme.secondaryText, size: 10),
           const SizedBox(width: 2),
           Text('$label ${target.toStringAsFixed(0).padLeft(2, '0')}%',
-              style: TextStyle(color: theme.primaryText, fontSize: 9)),
+              style: TextStyle(color: theme.primaryText, fontSize: 9, fontWeight: FontWeight.w700)),
           const SizedBox(width: 4),
           Expanded(
             child: AnimatedBuilder(

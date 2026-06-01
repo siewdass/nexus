@@ -4,18 +4,22 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:socket_io_plus/socket_io.dart';
-import 'package:llama_cpp_dart/llama_cpp_dart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:grpc/grpc.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'package:provider/provider.dart';
 import 'screens/home.dart';
-import 'services/status.dart';
+import 'services/state.dart';
+import 'services/settings.dart';
+import 'services/tunnel.dart';
+import 'services/grpc.dart';
 import 'services/theme_service.dart';
 import 'services/tray_service.dart';
 import 'services/llm_service.dart';
 
 final trayService = TrayService();
+final tunnelService = TunnelService();
 
 Directory? _cacheDir;
 
@@ -44,7 +48,6 @@ Future<String> extractAsset(String asset) async {
 }
 
 String? _localIp;
-String? _publicUrl;
 
 Future<String?> _findLocalIp() async {
   try {
@@ -74,7 +77,7 @@ void _startUdpDiscovery() {
         if (dg != null && utf8.decode(dg.data) == 'NEXUS_DISCOVER') {
           final response = jsonEncode({
             'private': _localIp ?? '',
-            'public': _publicUrl ?? '',
+            'public': hubState.publicUrl ?? '',
           });
           final data = utf8.encode(response);
           print('UDP respondiendo: $response');
@@ -110,173 +113,82 @@ void main() {
           ? '$_bundleAssets/Qwen3-0.6B-Q8_0.gguf'
           : await extractAsset('assets/Qwen3-0.6B-Q8_0.gguf');
       await llmService.init(dylibPath: dylib, modelPath: model);
-      serviceStatus.setLlmReady();
+      hubState.markLlmReady();
       print('LLM listo.');
     } catch (e, st) {
       print('Error LLM init: $e');
       print(st);
-      serviceStatus.setLlmError('$e');
+      hubState.setError('$e');
     }
 
     WidgetsFlutterBinding.ensureInitialized();
 
-  _localIp = await _findLocalIp();
-  serviceStatus.setPrivate(_localIp ?? '?');
-  _startUdpDiscovery();
-  serviceStatus.setUdpReady();
+    _localIp = await _findLocalIp();
+    hubState.setPrivateIp(_localIp ?? '?');
+    _startUdpDiscovery();
 
-  final io = Server();
-
-  var _inThink = false;
-  var _unprocessed = '';
-
-  void _clientEmit(Socket client, String event, String data) {
-    client.emit(event, data);
-  }
-
-  void _flushTokens(String chunk, Socket client) {
-    _unprocessed += chunk;
-    while (_unprocessed.isNotEmpty) {
-      if (!_inThink) {
-        final idx = _unprocessed.indexOf('<think>');
-        if (idx < 0) {
-          _clientEmit(client, 'token', _unprocessed);
-          _unprocessed = '';
-          break;
-        }
-        if (idx > 0) {
-          _clientEmit(client, 'token', _unprocessed.substring(0, idx));
-        }
-        _unprocessed = _unprocessed.substring(idx + 7);
-        _inThink = true;
-      } else {
-        final idx = _unprocessed.indexOf('</think>');
-        if (idx < 0) {
-          _clientEmit(client, 'think', _unprocessed);
-          _unprocessed = '';
-          break;
-        }
-        if (idx > 0) {
-          _clientEmit(client, 'think', _unprocessed.substring(0, idx));
-        }
-        _unprocessed = _unprocessed.substring(idx + 8);
-        _inThink = false;
-      }
-    }
-  }
-
-  io.on('connection', (Socket client) {
-    print('Cliente conectado: ${client.id}');
-
-    client.on('chat', (data) async {
-      if (llmService.engine == null) {
-        client.emit('error', 'Engine no inicializado');
-        return;
-      }
-
-      final text = (data as Map?)?['text'] as String?;
-      if (text == null || text.isEmpty) {
-        client.emit('error', 'Texto vacio');
-        return;
-      }
-
-      try {
-        final chat = await llmService.engine!.createChat();
-        chat.addSystem('Eres un asistente breve y conciso. Responde en espanol.');
-        chat.addUser(text);
-
-        await for (final event in chat.generate(
-          sampler: const SamplerParams(temperature: 0.7, topP: 0.9),
-          maxTokens: 4096,
-        )) {
-          if (event is TokenEvent) {
-            _flushTokens(event.text, client);
-          }
-        }
-
-        if (_unprocessed.isNotEmpty) {
-          if (_inThink) {
-            _clientEmit(client, 'think', _unprocessed);
-          } else {
-            _clientEmit(client, 'token', _unprocessed);
-          }
-          _unprocessed = '';
-        }
-        _inThink = false;
-        client.emit('done', '');
-      } catch (e, st) {
-        print('Error en chat: $e');
-        print(st);
-        client.emit('error', 'Error: $e');
-      }
-    });
-
-    client.on('disconnect', (_) {
-      print('Cliente desconectado: ${client.id}');
-    });
-  });
-
-  try {
-    await io.listen(5001);
-    serviceStatus.setServerReady();
-    print('Private: http://$_localIp:5001');
-  } catch (e) {
-    serviceStatus.setServerError('$e');
-  }
-
-  final tunnelPath = await extractAsset('assets/cloudflared');
-  final tunnelBin = File(tunnelPath);
-  if (await tunnelBin.exists()) {
+    // Iniciar servidor gRPC
     try {
-      final tunnel = await Process.start(
-        tunnelBin.path,
-        ['tunnel', '--url', 'http://localhost:5001', '--edge-ip-version', '4', '--no-autoupdate', '--retries', '1'],
-      );
-      tunnel.stderr.transform(utf8.decoder).listen((line) {
-        final match =
-            RegExp(r'https://[a-z-]+\.trycloudflare\.com').firstMatch(line);
-        if (match != null) {
-          _publicUrl = match.group(0);
-          serviceStatus.setPublicUrl(_publicUrl!);
-          print('Public: $_publicUrl');
-        }
-        if (line.contains('error') || line.contains('Failed')) {
-          serviceStatus.setTunnelError(line);
-        }
-      });
-    } catch (e) {
-      serviceStatus.setTunnelError('$e');
+      final grpcServer = Server.create(services: [GrpcService()]);
+      await grpcServer.serve(port: 5001);
+      hubState.markGrpcReady();
+      print('gRPC server en puerto 5001');
+      print('Private: http://$_localIp:5001');
+    } catch (e, st) {
+      print('Error gRPC server: $e');
+      print(st);
+      hubState.setError('$e');
     }
-  }
 
-  await windowManager.ensureInitialized();
+    // Escuchar cambios de settings para tunnel
+    settingsService.addListener(() {
+      if (settingsService.tunnel) {
+        extractAsset('assets/cloudflared').then((path) {
+          tunnelService.start(path);
+        });
+      } else {
+        tunnelService.stop();
+      }
+    });
 
-  await windowManager.waitUntilReadyToShow(
-    const WindowOptions(
-      size: Size(400, 300),
-      minimumSize: Size(400, 300),
-      center: true,
-      titleBarStyle: TitleBarStyle.hidden,
-      windowButtonVisibility: true,
-    ),
-  );
+    // Restaurar estado de tunnel
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('tunnel') == true) {
+      settingsService.setTunnel(true);
+    }
 
-  await windowManager.setPreventClose(true);
-  await trayService.init();
+    await windowManager.ensureInitialized();
 
-  final theme = ThemeService();
-  await theme.load();
+    await windowManager.waitUntilReadyToShow(
+      const WindowOptions(
+        size: Size(400, 300),
+        minimumSize: Size(400, 300),
+        center: true,
+        titleBarStyle: TitleBarStyle.hidden,
+        windowButtonVisibility: true,
+      ),
+    );
 
-  runApp(
-    ChangeNotifierProvider.value(
-      value: theme,
-      child: const Hub(),
-    ),
-  );
+    await windowManager.setPreventClose(true);
+    await trayService.init();
 
-  if (!kReleaseMode) {
-    await windowManager.show();
-  }
+    final theme = ThemeService();
+    await theme.load();
+
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: hubState),
+          ChangeNotifierProvider.value(value: settingsService),
+          ChangeNotifierProvider.value(value: theme),
+        ],
+        child: const Hub(),
+      ),
+    );
+
+    if (!kReleaseMode) {
+      await windowManager.show();
+    }
   }, (error, stack) {
     print('ERROR NO CAPTURADO: $error');
     print(stack);

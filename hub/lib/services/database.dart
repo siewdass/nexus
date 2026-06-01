@@ -12,8 +12,7 @@ class DatabaseService {
 
   Future<void> init() async {
     if (isOpen) return;
-    final dir = Directory(
-        '${Platform.environment['HOME'] ?? '/tmp'}/.nexus_hub/db');
+    final dir = Directory('${Platform.environment['HOME'] ?? '/tmp'}/.nexus_hub/db');
     if (!dir.existsSync()) dir.createSync(recursive: true);
     _db = await databaseFactoryIo.openDatabase('${dir.path}/nexus.db');
   }
@@ -25,19 +24,15 @@ class DatabaseService {
     return _db!;
   }
 
-  Future<int> create(
-      StoreRef<int, Map<String, dynamic>> store, Map<String, dynamic> value) {
+  Future<int> create(StoreRef<int, Map<String, dynamic>> store, Map<String, dynamic> value) {
     return store.add(_database, value);
   }
 
-  Future<Map<String, dynamic>?> read(
-      StoreRef<int, Map<String, dynamic>> store, int id) {
+  Future<Map<String, dynamic>?> read(StoreRef<int, Map<String, dynamic>> store, int id) {
     return store.record(id).get(_database);
   }
 
-  Future<void> update(
-      StoreRef<int, Map<String, dynamic>> store, int id,
-      Map<String, dynamic> value) {
+  Future<void> update(StoreRef<int, Map<String, dynamic>> store, int id, Map<String, dynamic> value) {
     return store.record(id).put(_database, value);
   }
 
@@ -45,8 +40,7 @@ class DatabaseService {
     return store.record(id).delete(_database);
   }
 
-  Future<List<Map<String, dynamic>>> readAll(
-      StoreRef<int, Map<String, dynamic>> store, {SortOrder? sortBy}) async {
+  Future<List<Map<String, dynamic>>> readAll(StoreRef<int, Map<String, dynamic>> store, {SortOrder? sortBy}) async {
     final finder = sortBy != null ? Finder(sortOrders: [sortBy]) : null;
     final snapshots = await store.find(_database, finder: finder);
     return snapshots.map((s) => s.value).toList();
@@ -56,8 +50,7 @@ class DatabaseService {
     return store.count(_database);
   }
 
-  Future<List<Map<String, dynamic>>> query(
-      StoreRef<int, Map<String, dynamic>> store, {Finder? finder}) async {
+  Future<List<Map<String, dynamic>>> query(StoreRef<int, Map<String, dynamic>> store, {Finder? finder}) async {
     final snapshots = await store.find(_database, finder: finder);
     return snapshots.map((s) => s.value).toList();
   }
@@ -66,9 +59,7 @@ class DatabaseService {
     return store.delete(_database);
   }
 
-  Future<List<int>> createBatch(
-      StoreRef<int, Map<String, dynamic>> store,
-      List<Map<String, dynamic>> values) async {
+  Future<List<int>> createBatch(StoreRef<int, Map<String, dynamic>> store, List<Map<String, dynamic>> values) async {
     final ids = <int>[];
     await _database.transaction((txn) async {
       for (final v in values) {
@@ -78,4 +69,3 @@ class DatabaseService {
     return ids;
   }
 }
-

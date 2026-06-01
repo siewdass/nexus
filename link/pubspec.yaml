@@ -15,10 +15,12 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   flutter_tts: ^4.2.5
   flutter_background_service: ^5.0.0
-  socket_io_client: ^3.0.2
   speech_to_text: ^7.4.0
   shared_preferences: ^2.3.4
   provider: ^6.1.2
+  nexus_grpc:
+    path: ../grpc
+    
 flutter:
   uses-material-design: true
   assets:

@@ -87,7 +87,10 @@ class _HomeState extends State<Home> {
 
   Future<void> _connect(ScanResult scan) async {
     if (scan.public.isNotEmpty) {
-      await networkService.connect(host: scan.public, port: 443);
+      final uri = Uri.parse(scan.public.startsWith('http') ? scan.public : 'http://$scan.public');
+      final port = uri.hasPort ? uri.port : 443;
+      final useTls = uri.scheme == 'https';
+      await networkService.connect(host: uri.host, port: port, useTls: useTls);
     } else {
       await networkService.connect(host: scan.private, port: 5001);
     }
@@ -136,70 +139,32 @@ class _HomeState extends State<Home> {
       HapticFeedback.heavyImpact();
       SystemSound.play(SystemSoundType.alert);
 
-      final interaction = _Interaction();
       setState(() {
         _recording = false;
         _isStarting = false;
         _nexusDetected = true;
-        _interactions.add(interaction);
       });
 
-      await showDetectionNotification(score);
+      // await showDetectionNotification(score);
 
       if (!networkService.isConnected) {
         final scan = Scanner.lastResult;
         if (scan == null) {
-          interaction.response = 'Sin servidor';
           _finishConversation();
           return;
         }
         try {
           await _connect(scan);
-        } catch (e) {
-          interaction.response = 'Error de conexión';
+        } catch (_) {
           _finishConversation();
           return;
         }
       }
 
-      final buffer = StringBuffer();
-      final completer = Completer<String>();
-      StreamSubscription tokenSub;
-      StreamSubscription thinkSub;
-      StreamSubscription doneSub;
-      StreamSubscription errSub;
-
-      tokenSub = networkService.tokens.listen((t) => buffer.write(t));
-      thinkSub = networkService.think.listen((t) {
-        setState(() => interaction.think += t);
-      });
-      doneSub = networkService.done.listen((_) {
-        if (!completer.isCompleted) completer.complete(buffer.toString());
-      });
-      errSub = networkService.errors.listen((e) {
-        if (!completer.isCompleted) completer.completeError(e);
-      });
-
-      networkService.sendChat(
-        'El usuario te ha llamado. Salúdalo brevemente y pregúntale cómo puedes ayudarle.',
-      );
-
-      try {
-        final response =
-            await completer.future.timeout(const Duration(seconds: 15));
-        setState(() => interaction.response = response);
-        await _tts.speakAndWait(response);
-        setState(() => _nexusDetected = false);
-        _startSttPhase();
-      } catch (e) {
-        setState(() => interaction.response = 'Error: $e');
-        _finishConversation();
-      } finally {
-        tokenSub.cancel();
-        thinkSub.cancel();
-        doneSub.cancel();
-        errSub.cancel();
-      }
+      await Future.delayed(const Duration(seconds: 1));
+      SystemSound.play(SystemSoundType.alert);
+      setState(() => _nexusDetected = false);
+      _startSttPhase();
     };
     _detector.loadModels();
   }

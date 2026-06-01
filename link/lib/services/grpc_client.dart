@@ -9,13 +9,13 @@ class GrpcClientService {
 
   bool get isConnected => _channel != null;
 
-  Future<void> connect({String host = 'localhost', int port = 5001}) async {
+  Future<void> connect({String host = 'localhost', int port = 5001, bool useTls = false}) async {
     disconnect();
     _channel = ClientChannel(
       host,
       port: port,
-      options: const ChannelOptions(
-        credentials: ChannelCredentials.insecure(),
+      options: ChannelOptions(
+        credentials: useTls ? const ChannelCredentials.secure() : const ChannelCredentials.insecure(),
       ),
     );
     _client = NexusServiceClient(_channel!);

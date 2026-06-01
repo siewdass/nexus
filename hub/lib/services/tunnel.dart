@@ -13,7 +13,7 @@ class TunnelService {
       cloudflaredPath,
       [
         'tunnel',
-        '--url', 'http://localhost:5001',
+        '--url', 'tcp://localhost:5001',
         '--edge-ip-version', '4',
         '--no-autoupdate',
         '--retries', '1',
@@ -25,8 +25,8 @@ class TunnelService {
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen((line) {
-      final match =
-          RegExp(r'https://[a-z-]+\.trycloudflare\.com').firstMatch(line);
+      final match = RegExp(r'(https?|tcp)://[a-z0-9-]+\.trycloudflare\.com(:\d+)?')
+          .firstMatch(line);
       if (match != null) {
         hubState.setPublicUrl(match.group(0));
       }

@@ -6,6 +6,15 @@ brew install protobuf
 
 Asegúrate de tener Flutter instalado. El código proto compartido está en `grpc/nexus.proto` y se compila con `./generate.sh`.
 
+### Librerías estáticas
+
+Las siguientes librerías se linkean estáticamente desde `hub/static/`:
+
+| Librería | Versión | Build |
+|----------|---------|-------|
+| **llama.cpp** | b4xx (commit reciente) | `cmake -B build -DGGML_METAL=ON -DLLAMA_METAL=ON -DBUILD_SHARED_LIBS=OFF && cmake --build build` |
+| **bore_ffi** | 0.5.0 | `cargo build --release && cp target/release/libbore_ffi.a ../../hub/static/` |
+
 ## Hub
 
 Servidor Dart/Flutter de escritorio con LLM local (Qwen3-0.6B) vía llama.cpp con aceleración Metal.
@@ -19,7 +28,7 @@ Servidor Dart/Flutter de escritorio con LLM local (Qwen3-0.6B) vía llama.cpp co
   - `SettingsPatch` — escribe `SharedPreferences` y aplica cambio en vivo
 - **Think parsing** — extrae tags `<think>...</think>` del stream de tokens en tiempo real
 - **UDP discovery** — puerto `5002`, responde a `NEXUS_DISCOVER` con `{private, public}`
-- **Túnel Cloudflare** — `cloudflared tunnel --url http://localhost:5001`, gestionado por `TunnelService`
+- **Túnel bore** — túnel TCP vía `bore.pub` usando bore_ffi (FFI con linkeo estático, sin binarios externos)
 - **Dashboard** — tarjetas de estado (LLM, gRPC, Tunnel) con indicadores visuales
 - **Settings** — DragToMoveArea personalizado (sin AppBar), toggle de tema y tunnel, icono de guardar
 - **MultiProvider** — `StateService`, `SettingsService`, `ThemeService` accesibles vía Provider

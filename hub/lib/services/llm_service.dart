@@ -5,11 +5,10 @@ class LlmService {
 
   LlamaEngine? get engine => _engine;
 
-  Future<void> init({required String dylibPath, required String modelPath}) async {
-    LlamaLibrary.load(path: dylibPath);
+  Future<void> init({required String modelPath}) async {
+    LlamaLibrary.loadFromProcess();
     LlamaLog.captureToFile('/dev/null');
-    _engine = await LlamaEngine.spawn(
-      libraryPath: dylibPath,
+    _engine = await LlamaEngine.spawnFromProcess(
       modelParams: ModelParams(path: modelPath, gpuLayers: 99),
       contextParams: const ContextParams(nCtx: 4096),
     );

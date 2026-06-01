@@ -39,11 +39,6 @@ Future<String> extractAsset(String asset) async {
   print('Extrayendo $asset...');
   final data = await rootBundle.load(asset);
   await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
-  if (Platform.isMacOS) {
-    await Process.run('chmod', ['+x', file.path]);
-    await Process.run('xattr', ['-d', 'com.apple.quarantine', file.path]);
-    await Process.run('codesign', ['--force', '--sign', '-', file.path]);
-  }
   print('Extraido ${file.path}');
   return file.path;
 }
@@ -107,13 +102,10 @@ void main() {
 
     // Inicializar LLM antes de Flutter para que Metal sea de llama.cpp
     try {
-      final dylib = _bundleAssets != null
-          ? '$_bundleAssets/libllama.dylib'
-          : await extractAsset('assets/libllama.dylib');
       final model = _bundleAssets != null
           ? '$_bundleAssets/Qwen3-0.6B-Q8_0.gguf'
           : await extractAsset('assets/Qwen3-0.6B-Q8_0.gguf');
-      await llmService.init(dylibPath: dylib, modelPath: model);
+      await llmService.init(modelPath: model);
       hubState.markLlmReady();
       print('LLM listo.');
     } catch (e, st) {
@@ -141,15 +133,12 @@ void main() {
       hubState.setError('$e');
     }
 
-    // Cargar libtunnel.dylib
+    // Inicializar tunnel FFI
     try {
-      final dylib = _bundleAssets != null
-          ? '$_bundleAssets/libtunnel.dylib'
-          : await extractAsset('assets/libtunnel.dylib');
-      tunnelService.init(TunnelFfi(dylib));
+      tunnelService.init(TunnelFfi());
       print('Tunnel FFI listo.');
     } catch (e, st) {
-      print('Error cargando libtunnel.dylib: $e');
+      print('Error cargando tunnel FFI: $e');
       print(st);
     }
 

@@ -23,7 +23,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon.png
-    - assets/libllama.dylib
+
     - assets/Qwen3-0.6B-Q8_0.gguf
-    - assets/cloudflared
-    - assets/libtunnel.dylib

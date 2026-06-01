@@ -16,8 +16,8 @@ class TunnelFfi {
   late final TunnelUrlDart _tunnelUrl;
   late final FreeStringDart _freeString;
 
-  TunnelFfi(String dylibPath) {
-    final lib = DynamicLibrary.open(dylibPath);
+  TunnelFfi() {
+    final lib = DynamicLibrary.process();
     _start = lib.lookupFunction<StartTunnelNative, StartTunnelDart>('start_tunnel');
     _stop = lib.lookupFunction<StopTunnelNative, StopTunnelDart>('stop_tunnel');
     _tunnelUrl = lib.lookupFunction<TunnelUrlNative, TunnelUrlDart>('tunnel_url');

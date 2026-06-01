@@ -24,9 +24,9 @@ class NetworkService extends ChangeNotifier {
 
   bool get isConnected => _grpc?.isConnected ?? false;
 
-  Future<void> connect({String host = 'localhost', int port = 5001, bool useTls = false}) async {
+  Future<void> connect({String host = 'localhost', int port = 5001}) async {
     final id = ++_connectCount;
-    debugPrint('NET connect#$id: host=$host:$port tls=$useTls connected=$isConnected connecting=$_connecting');
+    debugPrint('NET connect#$id: host=$host:$port connected=$isConnected connecting=$_connecting');
     if (_connecting) {
       debugPrint('NET connect#$id skipped: already connecting');
       return;
@@ -36,7 +36,7 @@ class NetworkService extends ChangeNotifier {
 
     try {
       _grpc = GrpcClientService();
-      await _grpc!.connect(host: host, port: port, useTls: useTls);
+      await _grpc!.connect(host: host, port: port);
       debugPrint('NET connect#$id connected');
       notifyListeners();
     } catch (e) {
@@ -72,6 +72,7 @@ class NetworkService extends ChangeNotifier {
       },
       onError: (e) {
         _errorController.add('$e');
+        disconnect();
       },
     );
   }

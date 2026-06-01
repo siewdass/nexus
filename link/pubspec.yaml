@@ -20,6 +20,7 @@ dependencies:
   provider: ^6.1.2
   nexus_grpc:
     path: ../grpc
+  audioplayers: ^6.1.0
     
 flutter:
   uses-material-design: true
@@ -27,3 +28,4 @@ flutter:
     - assets/melspectrogram.tflite
     - assets/embedding.tflite
     - assets/nexus.tflite
+    - assets/beep.wav

@@ -26,3 +26,4 @@ flutter:
     - assets/libllama.dylib
     - assets/Qwen3-0.6B-Q8_0.gguf
     - assets/cloudflared
+    - assets/libtunnel.dylib

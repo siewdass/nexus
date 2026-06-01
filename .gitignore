@@ -29,7 +29,8 @@
 **/.pub/
 **/build/
 **/coverage/
-**/.gradle/
+**/.gradle
+**/analysis_options.yaml
 
 # Dart compiled binaries
 **/bin/

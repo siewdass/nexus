@@ -13,6 +13,7 @@ import 'screens/home.dart';
 import 'services/state.dart';
 import 'services/settings.dart';
 import 'services/tunnel.dart';
+import 'services/tunnel_ffi.dart';
 import 'services/grpc.dart';
 import 'services/theme_service.dart';
 import 'services/tray_service.dart';
@@ -140,20 +141,31 @@ void main() {
       hubState.setError('$e');
     }
 
+    // Cargar libtunnel.dylib
+    try {
+      final dylib = _bundleAssets != null
+          ? '$_bundleAssets/libtunnel.dylib'
+          : await extractAsset('assets/libtunnel.dylib');
+      tunnelService.init(TunnelFfi(dylib));
+      print('Tunnel FFI listo.');
+    } catch (e, st) {
+      print('Error cargando libtunnel.dylib: $e');
+      print(st);
+    }
+
     // Escuchar cambios de settings para tunnel
     settingsService.addListener(() {
       if (settingsService.tunnel) {
-        extractAsset('assets/cloudflared').then((path) {
-          tunnelService.start(path);
-        });
+        tunnelService.start();
       } else {
         tunnelService.stop();
       }
     });
 
-    // Restaurar estado de tunnel
+    // Restaurar estado de tunnel (por defecto true)
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('tunnel') == true) {
+    final tunnelEnabled = prefs.getBool('tunnel') ?? true;
+    if (tunnelEnabled) {
       settingsService.setTunnel(true);
     }
 

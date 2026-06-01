@@ -5,6 +5,7 @@ import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:provider/provider.dart';
+import '../services/beep.dart';
 import '../services/notifications.dart';
 import '../services/wake.dart';
 import '../services/tts.dart';
@@ -26,6 +27,7 @@ class _Interaction {
 
 final _tts = TtsService();
 final _stt = SttService();
+final _beep = BeepService();
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -87,13 +89,15 @@ class _HomeState extends State<Home> {
 
   Future<void> _connect(ScanResult scan) async {
     if (scan.public.isNotEmpty) {
-      final uri = Uri.parse(scan.public.startsWith('http') ? scan.public : 'http://$scan.public');
-      final port = uri.hasPort ? uri.port : 443;
-      final useTls = uri.scheme == 'https';
-      await networkService.connect(host: uri.host, port: port, useTls: useTls);
-    } else {
-      await networkService.connect(host: scan.private, port: 5001);
+      final parts = scan.public.split(':');
+      final host = parts[0];
+      final port = parts.length > 1 ? int.parse(parts[1]) : 5001;
+      try {
+        await networkService.connect(host: host, port: port);
+        return;
+      } catch (_) {}
     }
+    await networkService.connect(host: scan.private, port: 5001);
   }
 
   Future<void> _tryReconnect() async {
@@ -137,7 +141,6 @@ class _HomeState extends State<Home> {
       await _stopRecorder();
       _bgService.invoke('stopService');
       HapticFeedback.heavyImpact();
-      SystemSound.play(SystemSoundType.alert);
 
       setState(() {
         _recording = false;
@@ -161,8 +164,8 @@ class _HomeState extends State<Home> {
         }
       }
 
-      await Future.delayed(const Duration(seconds: 1));
-      SystemSound.play(SystemSoundType.alert);
+      await Future.delayed(const Duration(milliseconds: 500));
+      _beep.play();
       setState(() => _nexusDetected = false);
       _startSttPhase();
     };

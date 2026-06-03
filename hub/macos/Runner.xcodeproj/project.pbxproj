@@ -492,7 +492,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.nexusExample.RunnerTests;
 				PRODUCT_NAME = "nexus_hub";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NexusHub.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/NexusHub";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Nexus Hub.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Nexus Hub";
 			};
 			name = Debug;
 		};
@@ -507,7 +507,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.nexusExample.RunnerTests;
 				PRODUCT_NAME = "nexus_hub";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NexusHub.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/NexusHub";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Nexus Hub.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Nexus Hub";
 			};
 			name = Release;
 		};
@@ -522,7 +522,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.nexusExample.RunnerTests;
 				PRODUCT_NAME = "nexus_hub";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NexusHub.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/NexusHub";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Nexus Hub.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Nexus Hub";
 			};
 			name = Profile;
 		};

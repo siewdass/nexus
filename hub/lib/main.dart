@@ -43,7 +43,8 @@ void main() async {
 
   await windowManager.ensureInitialized();
   windowManager.waitUntilReadyToShow().then((_) {
-    windowManager.setSize(const Size(400, 300));
+    windowManager.setSize(const Size(540, 400));
+    windowManager.setTitle('Nexus Hub');
     windowManager.setTitleBarStyle(TitleBarStyle.hidden);
   });
 

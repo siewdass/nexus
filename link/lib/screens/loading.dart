@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/rtc_client.dart';
 import '../services/theme_service.dart';
+import '../widgets/app_icon.dart';
 import 'scan_screen.dart';
 import 'home.dart';
 
@@ -35,6 +36,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
 
     if (uuid != null && uuid.isNotEmpty) {
       setState(() {
+        _checking = false;
         _hasUuid = true;
         _connecting = true;
         _message = 'Conectando al Hub...';
@@ -131,7 +133,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.smart_toy, size: 80, color: theme.primaryText),
+            AppIcon(size: 80),
             const SizedBox(height: 24),
             Text(
               'Nexus Link',

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -28,7 +29,11 @@ class TrayService with TrayListener {
       ],
     );
 
-    await trayManager.setIcon('assets/icon.png', isTemplate: true);
+    final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    final iconPath = brightness == Brightness.dark
+        ? 'assets/icon-light.png'
+        : 'assets/icon-dark.png';
+    await trayManager.setIcon(iconPath, isTemplate: true);
     await trayManager.setToolTip('Nexus Hub');
     await trayManager.setContextMenu(_menu);
     trayManager.addListener(this);

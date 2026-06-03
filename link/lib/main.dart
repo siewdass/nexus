@@ -60,8 +60,8 @@ Future<void> _initBackgroundService() async {
       autoStart: false,
       isForegroundMode: true,
       notificationChannelId: 'nexus_service',
-      initialNotificationContent: 'Escuchando wake word...',
-      initialNotificationTitle: 'Nexus',
+      initialNotificationContent: 'Escuchando...',
+      initialNotificationTitle: 'Nexus Link',
       foregroundServiceNotificationId: 9999,
       foregroundServiceTypes: [AndroidForegroundType.microphone],
     ),
@@ -73,5 +73,12 @@ Future<void> _initBackgroundService() async {
 void _onBgStart(ServiceInstance service) {
   if (service is AndroidServiceInstance) {
     service.on('stopService').listen((_) => service.stopSelf());
+
+    service.on('updateNotification').listen((data) {
+      service.setForegroundNotificationInfo(
+        title: data!['title'] as String,
+        content: data['content'] as String,
+      );
+    });
   }
 }

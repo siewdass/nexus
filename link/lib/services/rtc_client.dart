@@ -5,21 +5,27 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:peer_rtc/peer_rtc.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 enum LinkPeerStatus { idle, ping, answered, connected }
 
 class PeerRTCClient extends ChangeNotifier {
   String? _uuid;
+  String? _hubPeerId;
   Peer? _peer;
   DataConnection? _connection;
   StreamSubscription<DocumentSnapshot>? _firestoreSub;
   StreamSubscription<String?>? _peerOpenSub;
   LinkPeerStatus _status = LinkPeerStatus.idle;
+  bool _reconnecting = false;
+  int _reconnectAttempts = 0;
+  static const _maxReconnectAttempts = 10;
 
   final _tokenController = StreamController<String>.broadcast();
   final _thinkController = StreamController<String>.broadcast();
   final _doneController = StreamController<void>.broadcast();
   final _errorController = StreamController<String>.broadcast();
+  bool _pendingChat = false;
 
   Stream<String> get tokens => _tokenController.stream;
   Stream<String> get think => _thinkController.stream;
@@ -36,6 +42,7 @@ class PeerRTCClient extends ChangeNotifier {
     _uuid = uuid;
     _status = LinkPeerStatus.ping;
     notifyListeners();
+    _updateNotification('Conectando...');
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('hub_uuid', uuid);
@@ -61,6 +68,10 @@ class PeerRTCClient extends ChangeNotifier {
   }
 
   Future<void> _connectToHub(String uuid) async {
+    if (_connection != null) {
+      debugPrint('[RTC_CLIENT] already connected, skipping _connectToHub');
+      return;
+    }
     try {
       final snap = await FirebaseFirestore.instance
           .collection('connections')
@@ -86,12 +97,14 @@ class PeerRTCClient extends ChangeNotifier {
 
       debugPrint('[RTC_CLIENT] hub peer_id: $hubPeerId');
 
+      _connection?.close();
       _connection = _peer!.connect(hubPeerId);
 
       _connection!.onOpen.listen((_) {
         debugPrint('[RTC_CLIENT] data channel open');
         _status = LinkPeerStatus.connected;
         notifyListeners();
+        _updateNotification('Conectado');
       });
 
       _connection!.onData.listen((data) {
@@ -104,6 +117,12 @@ class PeerRTCClient extends ChangeNotifier {
         _status = LinkPeerStatus.idle;
         _connection = null;
         notifyListeners();
+        if (_pendingChat) {
+          _pendingChat = false;
+          _errorController.add('Conexión perdida con el hub');
+        }
+        _updateNotification('Reconectando...');
+        _autoReconnect();
       });
     } catch (e, st) {
       debugPrint('[RTC_CLIENT] connect to hub error: $e\n$st');
@@ -120,8 +139,10 @@ class PeerRTCClient extends ChangeNotifier {
         case 'think':
           _thinkController.add(msg['text'] as String);
         case 'done':
+          _pendingChat = false;
           _doneController.add(null);
         case 'error':
+          _pendingChat = false;
           _errorController.add(msg['text'] as String? ?? 'Error desconocido');
       }
     } catch (e) {
@@ -134,9 +155,11 @@ class PeerRTCClient extends ChangeNotifier {
       _errorController.add('No conectado');
       return;
     }
+    _pendingChat = true;
     try {
       _connection!.send(jsonEncode({'type': 'chat', 'text': text}));
     } catch (e) {
+      _pendingChat = false;
       _errorController.add('Error al enviar: $e');
     }
   }
@@ -153,7 +176,40 @@ class PeerRTCClient extends ChangeNotifier {
     }
   }
 
+  void _autoReconnect() async {
+    if (_reconnecting || _uuid == null) return;
+    _reconnecting = true;
+    _reconnectAttempts = 0;
+
+    while (_reconnectAttempts < _maxReconnectAttempts) {
+      _reconnectAttempts++;
+      await Future.delayed(const Duration(seconds: 3));
+      if (_connection != null || _uuid == null) break;
+      debugPrint('[RTC_CLIENT] reconnect attempt $_reconnectAttempts');
+      try {
+        await _connectToHub(_uuid!);
+        if (_connection != null) break;
+      } catch (_) {}
+    }
+    _reconnecting = false;
+    _reconnectAttempts = 0;
+    if (_connection == null) {
+      _updateNotification('Escuchando...');
+    }
+  }
+
+  void _updateNotification(String content) {
+    try {
+      FlutterBackgroundService().invoke('updateNotification', {
+        'title': 'Nexus Link',
+        'content': content,
+      });
+    } catch (_) {}
+  }
+
   void disconnect() {
+    _reconnecting = false;
+    _pendingChat = false;
     _firestoreSub?.cancel();
     _peerOpenSub?.cancel();
     _connection?.close();
@@ -161,7 +217,11 @@ class PeerRTCClient extends ChangeNotifier {
     _peer = null;
     _connection = null;
     _uuid = null;
+    _hubPeerId = null;
     _status = LinkPeerStatus.idle;
+    _reconnectAttempts = 0;
+    _reconnecting = false;
+    _updateNotification('Escuchando...');
     notifyListeners();
   }
 

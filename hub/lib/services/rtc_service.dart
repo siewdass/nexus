@@ -69,6 +69,11 @@ class PeerRTCService extends ChangeNotifier {
 
       _peerConnSub = _peer!.onConnection.listen((conn) {
         debugPrint('[RTC] incoming connection from: ${conn.peer}');
+        _connection?.close();
+        _connection = null;
+        _status = PeerStatus.waiting;
+        notifyListeners();
+
         _connection = conn;
         _status = PeerStatus.connected;
         notifyListeners();
@@ -87,14 +92,16 @@ class PeerRTCService extends ChangeNotifier {
 
         conn.onOpen.listen((_) {
           debugPrint('[RTC] connection open');
-          notifyListeners();
+          if (_connection == conn) notifyListeners();
         });
 
         conn.onClose.listen((_) {
           debugPrint('[RTC] connection closed');
-          _status = PeerStatus.waiting;
-          _connection = null;
-          notifyListeners();
+          if (_connection == conn) {
+            _status = PeerStatus.waiting;
+            _connection = null;
+            notifyListeners();
+          }
         });
       });
 
@@ -181,7 +188,7 @@ class PeerRTCService extends ChangeNotifier {
       debugPrint('[LLM] error: $e\n$st');
       _connection?.send(jsonEncode({'type': 'error', 'text': 'Error: $e'}));
     } finally {
-      await session?.dispose();
+      try { await session?.dispose(); } catch (_) {}
     }
   }
 

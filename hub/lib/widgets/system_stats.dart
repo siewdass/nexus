@@ -16,6 +16,7 @@ class _SystemStatsState extends State<SystemStats>
     with SingleTickerProviderStateMixin {
   double _cpu = 0, _mem = 0, _disk = 0;
   double _cpuTarget = 0, _memTarget = 0, _diskTarget = 0;
+  int _pingMs = 0;
   late AnimationController _animCtrl;
   Timer? _timer;
 
@@ -52,12 +53,14 @@ class _SystemStatsState extends State<SystemStats>
         _getCpuUsage(),
         _getMemUsage(),
         _getDiskUsage(),
+        _getPing(),
       ]);
       if (mounted) {
         setState(() {
-          _cpuTarget = results[0];
-          _memTarget = results[1];
-          _diskTarget = results[2];
+          _cpuTarget = results[0] as double;
+          _memTarget = results[1] as double;
+          _diskTarget = results[2] as double;
+          _pingMs = results[3] as int;
         });
         _animCtrl.forward(from: 0);
       }
@@ -122,6 +125,17 @@ class _SystemStatsState extends State<SystemStats>
     }
   }
 
+  Future<int> _getPing() async {
+    try {
+      final r = await Process.run('ping', ['-c', '1', '-t', '3', '8.8.8.8']);
+      final match = RegExp(r'time=([\d.]+)\s*ms').firstMatch(r.stdout as String);
+      if (match != null) return (double.tryParse(match.group(1) ?? '0') ?? 0).round();
+      return 999;
+    } catch (_) {
+      return 999;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeService>();
@@ -132,6 +146,8 @@ class _SystemStatsState extends State<SystemStats>
         _bar(theme, Icons.developer_board, 'RAM', _mem, _memTarget),
         const SizedBox(width: 8),
         _bar(theme, Icons.storage, 'DISK', _disk, _diskTarget),
+        const SizedBox(width: 8),
+        _pingBar(theme),
       ],
     );
   }
@@ -141,7 +157,7 @@ class _SystemStatsState extends State<SystemStats>
     return Expanded(
       child: Row(
         children: [
-          Icon(icon, color: theme.secondaryText, size: 10),
+          Icon(icon, color: theme.secondaryText, size: 13),
           const SizedBox(width: 2),
           Text('$label ${target.toStringAsFixed(0).padLeft(2, '0')}%',
               style: TextStyle(color: theme.primaryText, fontSize: 9, fontWeight: FontWeight.w700)),
@@ -159,6 +175,30 @@ class _SystemStatsState extends State<SystemStats>
                   minHeight: 5,
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pingBar(ThemeService theme) {
+    final ms = _pingMs;
+    final value = (ms / 300).clamp(0.0, 1.0);
+    final color = ms < 60 ? Colors.greenAccent : (ms < 99 ? Colors.orangeAccent : Colors.redAccent);
+    return Expanded(
+      child: Row(
+        children: [
+          Icon(Icons.lan, color: theme.secondaryText, size: 13),
+          const SizedBox(width: 2),
+          Text('PING ${ms}ms', style: TextStyle(color: theme.primaryText, fontSize: 9, fontWeight: FontWeight.w700)),
+          const SizedBox(width: 4),
+          Expanded(
+            child: LinearProgressIndicator(
+              value: value,
+              color: color,
+              backgroundColor: theme.inactiveBg,
+              minHeight: 5,
             ),
           ),
         ],

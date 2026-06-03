@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
+import 'state.dart';
 
 class PromptFormat {
   final String systemPrefix;
@@ -23,15 +26,20 @@ class PromptFormat {
 
 class ModelConfig {
   final String name;
+  final String? quantization;
+  final int? contextSize;
   final String systemPrompt;
   final PromptFormat promptFormat;
   final SamplerParams sampler;
   final int maxTokens;
   final String? thinkStart;
   final String? thinkEnd;
+  int? fileSize;
 
   ModelConfig({
     required this.name,
+    this.quantization,
+    this.contextSize = 4096,
     this.systemPrompt = 'Eres un asistente breve y conciso. Responde en espanol.',
     required this.promptFormat,
     SamplerParams? sampler,
@@ -60,7 +68,8 @@ const _chatmlFormat = PromptFormat(
 ModelConfig configForModel(String modelPath) {
   if (modelPath.contains('gemma') || modelPath.contains('Gemma')) {
     return ModelConfig(
-      name: 'Gemma 4 E2B Q4',
+      name: 'Gemma 4 E2B',
+      quantization: 'Q4_K_M',
       systemPrompt: 'Eres un asistente util. Responde en espanol.',
       promptFormat: _gemmaFormat,
       maxTokens: 4096,
@@ -69,7 +78,8 @@ ModelConfig configForModel(String modelPath) {
     );
   }
   return ModelConfig(
-    name: 'Qwen 3 0.6B Q4',
+    name: 'Qwen 3 0.6B',
+    quantization: 'Q4_K_M',
     promptFormat: _chatmlFormat,
     thinkStart: '<think>',
     thinkEnd: '</think>',
@@ -79,19 +89,49 @@ ModelConfig configForModel(String modelPath) {
 class LlmService {
   LlamaEngine? _engine;
   ModelConfig? _modelConfig;
+  Timer? _memTimer;
 
   LlamaEngine? get engine => _engine;
   ModelConfig? get modelConfig => _modelConfig;
 
   Future<void> init({required String modelPath}) async {
     _modelConfig = configForModel(modelPath);
+    _modelConfig!.fileSize = File(modelPath).lengthSync();
     LlamaLibrary.loadFromProcess();
     LlamaLog.captureToFile('/dev/null');
     _engine = await LlamaEngine.spawnFromProcess(
       modelParams: ModelParams(path: modelPath, gpuLayers: 99),
-      contextParams: const ContextParams(nCtx: 4096),
+      contextParams: ContextParams(nCtx: _modelConfig!.contextSize ?? 0),
     );
+    _pollMemory();
+    _memTimer = Timer.periodic(const Duration(seconds: 5), (_) => _pollMemory());
     print('[LLM] ${_modelConfig?.name} listo');
+  }
+
+  Future<void> _pollMemory() async {
+    try {
+      final r = await Process.run('vmmap', ['--summary', '$pid']);
+      for (final line in (r.stdout as String).split('\n')) {
+        if (line.startsWith('Physical footprint:')) {
+          final bytes = _parseSize(line.split(':')[1].trim());
+          hubState.setPhysicalBytes(bytes);
+          break;
+        }
+      }
+    } catch (_) {}
+  }
+
+  int _parseSize(String s) {
+    s = s.trim().toUpperCase();
+    if (s.endsWith('G')) return (double.parse(s.replaceAll('G', '')) * 1073741824).round();
+    if (s.endsWith('M')) return (double.parse(s.replaceAll('M', '')) * 1048576).round();
+    if (s.endsWith('K')) return (double.parse(s.replaceAll('K', '')) * 1024).round();
+    return int.tryParse(s) ?? 0;
+  }
+
+  void dispose() {
+    _memTimer?.cancel();
+    _engine?.dispose();
   }
 }
 

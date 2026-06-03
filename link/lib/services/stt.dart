@@ -8,6 +8,7 @@ class SttService {
   String _lastWords = '';
   Completer<void>? _sessionDone;
   Timer? _silenceTimer;
+  Timer? _maxDurationTimer;
 
   bool get isInitialized => _initialized;
   bool get isListening => _speech?.isListening ?? false;
@@ -33,7 +34,7 @@ class SttService {
     return _initialized;
   }
 
-  void _resetSilenceTimer() {
+  void _resetSilenceTimer(String currentText) {
     _silenceTimer?.cancel();
     _silenceTimer = Timer(const Duration(seconds: 3), () {
       debugPrint('[STT] silence 3s -> done');
@@ -43,24 +44,39 @@ class SttService {
     });
   }
 
+  void _cancelTimers() {
+    _silenceTimer?.cancel();
+    _silenceTimer = null;
+    _maxDurationTimer?.cancel();
+    _maxDurationTimer = null;
+  }
+
   Future<String?> start() async {
     if (!_initialized || _speech == null) return null;
     _lastWords = '';
     _sessionDone = Completer<void>();
-    _silenceTimer?.cancel();
+    _cancelTimers();
 
     debugPrint('[STT] listen()');
+
+    _maxDurationTimer = Timer(const Duration(seconds: 10), () {
+      debugPrint('[STT] max 10s -> done');
+      if (_sessionDone != null && !_sessionDone!.isCompleted) {
+        _sessionDone!.complete();
+      }
+    });
+
     try {
       await _speech!.listen(
         onResult: (r) {
           final text = r.recognizedWords.trim();
-          if (text.isNotEmpty) {
+          if (text.isNotEmpty && text != _lastWords) {
             _lastWords = text;
             debugPrint('[STT] <<< $text');
-            _resetSilenceTimer();
+            _resetSilenceTimer(text);
           }
           if (r.finalResult) {
-            _silenceTimer?.cancel();
+            _cancelTimers();
             if (_sessionDone != null && !_sessionDone!.isCompleted) {
               _sessionDone!.complete();
             }
@@ -76,17 +92,19 @@ class SttService {
 
     debugPrint('[STT] waiting for done...');
     await _sessionDone!.future;
-    // Some Android devices fire 'done' (no result) before actual
-    // recognition results arrive. Wait briefly for late results.
-    await Future.delayed(const Duration(seconds: 1));
-    _silenceTimer?.cancel();
+    _cancelTimers();
+    // Solo esperar resultados tardios si aun no hay palabras reconocidas
+    if (_lastWords.isEmpty) {
+      await Future.delayed(const Duration(seconds: 1));
+    }
+    _cancelTimers();
     debugPrint('[STT] result: "$_lastWords"');
     return _lastWords.isNotEmpty ? _lastWords : null;
   }
 
   Future<void> stop() async {
     debugPrint('[STT] stop');
-    _silenceTimer?.cancel();
+    _cancelTimers();
     if (_sessionDone != null && !_sessionDone!.isCompleted) {
       _sessionDone!.complete();
     }
@@ -94,7 +112,7 @@ class SttService {
   }
 
   void dispose() {
-    _silenceTimer?.cancel();
+    _cancelTimers();
     _sessionDone?.complete();
     _speech?.stop();
     _speech = null;

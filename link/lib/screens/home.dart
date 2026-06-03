@@ -12,6 +12,7 @@ import '../services/tts.dart';
 import '../services/stt.dart';
 import '../services/theme_service.dart';
 import '../services/rtc_client.dart';
+import '../widgets/app_icon.dart';
 import 'settings.dart';
 
 class _Interaction {
@@ -216,6 +217,18 @@ class _HomeState extends State<Home> {
         return;
       }
 
+      if (!context.read<PeerRTCClient>().isConnected) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sin conexión al hub. Escanea el código QR.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+
       if (_nexusDetected) {
         await _tts.stop();
         setState(() => _nexusDetected = false);
@@ -293,6 +306,7 @@ class _HomeState extends State<Home> {
           ],
         ),
       floatingActionButton: _Fab(
+        isConnected: context.watch<PeerRTCClient>().isConnected,
         listening: _listening,
         isStarting: _isStarting,
         onPressed: _toggleListening,
@@ -304,10 +318,10 @@ class _HomeState extends State<Home> {
             const LinearProgressIndicator(minHeight: 2),
           Expanded(
             child: _interactions.isEmpty && !_modelsReady
-                ? const Center(child: Icon(Icons.smart_toy, size: 80))
+                ? const Center(child: AppIcon(size: 80))
                 : _interactions.isEmpty
                     ? Center(
-                        child: Icon(Icons.smart_toy, size: 80, color: theme.primaryText),
+                        child: AppIcon(size: 80),
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
@@ -338,12 +352,14 @@ class _HomeState extends State<Home> {
 }  // _HomeState
 
 class _Fab extends StatelessWidget {
+  final bool isConnected;
   final bool listening;
   final bool isStarting;
   final VoidCallback onPressed;
   final ThemeService theme;
 
   const _Fab({
+    required this.isConnected,
     required this.listening,
     required this.isStarting,
     required this.onPressed,
@@ -352,10 +368,15 @@ class _Fab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final disabled = !isConnected;
     return RepaintBoundary(
       child: FloatingActionButton(
-        onPressed: onPressed,
-        backgroundColor: listening ? theme.green : theme.inactiveBg,
+        onPressed: disabled ? null : onPressed,
+        backgroundColor: disabled
+            ? theme.inactiveBg.withAlpha(128)
+            : listening
+                ? theme.green
+                : theme.inactiveBg,
         child: isStarting
             ? SizedBox(
                 width: 24,
@@ -369,7 +390,9 @@ class _Fab extends StatelessWidget {
             : Icon(
                 listening ? Icons.stop : Icons.play_arrow,
                 size: 28,
-                color: theme.primaryText,
+                color: disabled
+                    ? theme.primaryText.withAlpha(100)
+                    : theme.primaryText,
               ),
       ),
     );
@@ -479,9 +502,7 @@ class _InteractionCard extends StatelessWidget {
                 ),
               ),
             ),
-        if (isActive &&
-            interaction.response.isEmpty &&
-            interaction.think.isNotEmpty)
+        if (interaction.response.isEmpty && interaction.think.isNotEmpty)
           SelectableText(
             interaction.think,
             style: TextStyle(

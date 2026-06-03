@@ -5,7 +5,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../services/theme_service.dart';
 import '../services/state.dart';
 import '../services/rtc_service.dart';
+import '../services/llm_service.dart';
 import '../widgets/system_stats.dart';
+import '../widgets/app_icon.dart';
 import 'settings.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -56,18 +58,21 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   const SystemStats(),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      _statusCard(theme, Icons.psychology, 'Agent', state.llmReady),
-                      const SizedBox(width: 8),
-                      _statusCard(theme, Icons.lan, 'Network', state.grpcReady),
-                      const SizedBox(width: 8),
-                      _statusCard(theme, Icons.cloud, 'Tunnel', state.tunnelReady),
-                    ],
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _statusColumn(theme, state),
+                        ),
+                        const SizedBox(width: 12),
+                        if (rtc.isInitialized && rtc.uuid.isNotEmpty)
+                          Expanded(
+                            child: _qrCard(theme, rtc),
+                          ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  if (rtc.isInitialized && rtc.uuid.isNotEmpty)
-                    _qrCard(theme, rtc),
                 ],
               ),
             ),
@@ -77,72 +82,109 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _statusCard(ThemeService theme, IconData icon, String label, bool ready) {
-    final color = ready ? theme.green : theme.secondaryText;
+  Widget _statusColumn(ThemeService theme, StateService state) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _agentRow(theme, state),
+      ],
+    );
+  }
+
+  Widget _agentRow(ThemeService theme, StateService state) {
+    final cfg = llmService.modelConfig;
+    final modelName = cfg?.name ?? 'Loading...';
+    final quant = cfg?.quantization;
+    final ctx = cfg?.contextSize;
+    final size = cfg?.fileSize;
+    final mem = state.physicalBytes;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: theme.inactiveBg,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 6),
-            Text(label, style: TextStyle(color: theme.primaryText, fontSize: 10, fontWeight: FontWeight.w600)),
+            Row(
+              children: [
+                AppIcon(size: 16),
+                const SizedBox(width: 8),
+                Text('Agent', style: TextStyle(color: theme.primaryText, fontSize: 11, fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            _infoRow(theme, 'Model:', modelName),
+            if (quant != null) _infoRow(theme, 'Quantized:', quant),
+            if (ctx != null) _infoRow(theme, 'Context:', _compact(ctx)),
+            _infoRow(theme, 'Size:', _formatGB(size ?? 0)),
+            _infoRow(theme, 'RAM:', _formatGB(mem ?? 0)),
           ],
         ),
       ),
     );
   }
 
-  Widget _qrCard(ThemeService theme, PeerRTCService rtc) {
-    final statusLabel = switch (rtc.status) {
-      PeerStatus.waiting => 'Esperando...',
-      PeerStatus.ping => 'Conectando...',
-      PeerStatus.answered => 'Conectado',
-      PeerStatus.connected => 'Conectado',
-    };
-    final statusColor = rtc.isConnected ? theme.green : theme.secondaryText;
+  String _compact(int n) {
+    if (n < 1000) return '$n';
+    if (n < 1000000) return '${(n / 1000).toStringAsFixed(1)}k';
+    if (n < 1000000000) return '${(n / 1000000).toStringAsFixed(1)}M';
+    return '${(n / 1000000000).toStringAsFixed(1)}G';
+  }
 
+  String _formatGB(int bytes) {
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  Widget _infoRow(ThemeService theme, String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(color: theme.primaryText, fontSize: 10, fontWeight: FontWeight.bold)),
+        Text(value, style: TextStyle(color: theme.primaryText, fontSize: 10)),
+      ],
+    );
+  }
+
+  Widget _qrCard(ThemeService theme, PeerRTCService rtc) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: theme.inactiveBg,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
-        children: [
-          QrImageView(
-            data: rtc.uuid,
-            version: QrVersions.auto,
-            size: 72,
-            eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: theme.primaryText),
-            dataModuleStyle: QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: theme.primaryText),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Vinculación', style: TextStyle(color: theme.primaryText, fontSize: 11, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text('${rtc.uuid.substring(0, 8)}...', style: TextStyle(color: theme.secondaryText, fontSize: 10, fontFamily: 'monospace')),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(width: 8, height: 8, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-                    const SizedBox(width: 4),
-                    Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 10)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final qrSize = (constraints.biggest.shortestSide - 16).clamp(80.0, 500.0);
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              QrImageView(
+                data: rtc.uuid,
+                version: QrVersions.auto,
+                size: qrSize,
+                eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: theme.primaryText),
+                dataModuleStyle: QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: theme.primaryText),
+              ),
+              const SizedBox(height: 6),
+              _linkStatusRow(theme, rtc),
+            ],
+          );
+        },
       ),
     );
+  }
+
+  Widget _linkStatusRow(ThemeService theme, PeerRTCService rtc) {
+    final label = switch (rtc.status) {
+      PeerStatus.waiting => 'Listening',
+      PeerStatus.ping => 'Handshakeing',
+      PeerStatus.answered => 'Connected',
+      PeerStatus.connected => 'Connected',
+    };
+    return Text('Link $label', style: TextStyle(color: theme.primaryText, fontSize: 10, fontWeight: FontWeight.bold));
   }
 }

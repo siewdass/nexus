@@ -3,21 +3,28 @@ import 'package:flutter/foundation.dart';
 class StateService extends ChangeNotifier {
   bool _llmReady = false;
   bool _grpcReady = false;
-  bool _tunnelReady = false;
   String _privateIp = '';
   String? _publicUrl;
   String? _error;
   double _downloadProgress = 0.0;
   String _downloadStatus = 'idle';
 
+  int? _physicalBytes;
+
   bool get llmReady => _llmReady;
   bool get grpcReady => _grpcReady;
-  bool get tunnelReady => _tunnelReady;
+
   String get privateIp => _privateIp;
   String? get publicUrl => _publicUrl;
   String? get error => _error;
   double get downloadProgress => _downloadProgress;
   String get downloadStatus => _downloadStatus;
+  int? get physicalBytes => _physicalBytes;
+
+  void setPhysicalBytes(int? v) {
+    _physicalBytes = v;
+    notifyListeners();
+  }
 
   void markLlmReady() {
     _llmReady = true;
@@ -26,11 +33,6 @@ class StateService extends ChangeNotifier {
 
   void markGrpcReady() {
     _grpcReady = true;
-    notifyListeners();
-  }
-
-  void markTunnelReady() {
-    _tunnelReady = true;
     notifyListeners();
   }
 

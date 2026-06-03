@@ -6,8 +6,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 
+import 'screens/api_token_screen.dart';
 import 'screens/home.dart';
 import 'screens/model_selector_screen.dart';
+import 'services/api_tokens.dart';
 import 'services/state.dart';
 import 'services/theme_service.dart';
 import 'services/rtc_service.dart';
@@ -65,19 +67,27 @@ void main() async {
   final theme = ThemeService();
   await theme.load();
 
+  final apiTokens = ApiTokenService();
+  await apiTokens.load();
+
+  final initialScreen = apiTokens.ready
+      ? existingModel != null
+          ? const HomeScreen()
+          : ModelSelectorScreen(modelsDir: modelsDir.path)
+      : ApiTokenScreen(modelsDir: modelsDir.path);
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: hubState),
         ChangeNotifierProvider.value(value: theme),
         ChangeNotifierProvider.value(value: rtcService),
+        ChangeNotifierProvider.value(value: apiTokens),
       ],
       child: Consumer<ThemeService>(
         builder: (_, t, __) => MaterialApp(
           theme: t.currentTheme,
-          home: existingModel != null
-              ? const HomeScreen()
-              : ModelSelectorScreen(modelsDir: modelsDir.path),
+          home: initialScreen,
         ),
       ),
     ),

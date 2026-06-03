@@ -76,11 +76,11 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 'Nexus Hub',
                 style: TextStyle(
                   color: theme.primaryText,
-                  fontSize: 24,
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
               if (state.downloadStatus == 'downloading') ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(6),
@@ -94,12 +94,12 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 const SizedBox(height: 12),
                 Text(
                   '${(state.downloadProgress * 100).toStringAsFixed(1)}%',
-                  style: TextStyle(color: theme.secondaryText, fontSize: 14),
+                  style: TextStyle(color: theme.secondaryText, fontSize: 13),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Descargando modelo...',
-                  style: TextStyle(color: theme.secondaryText, fontSize: 12),
+                  style: TextStyle(color: theme.secondaryText, fontSize: 13),
                 ),
               ] else if (state.downloadStatus == 'ready') ...[
                 SizedBox(
@@ -113,14 +113,14 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'Inicializando LLM...',
-                  style: TextStyle(color: theme.secondaryText, fontSize: 14),
+                  style: TextStyle(color: theme.secondaryText, fontSize: 13),
                 ),
               ] else if (state.downloadStatus == 'error') ...[
                 Icon(Icons.error_outline, color: Colors.red[300], size: 48),
                 const SizedBox(height: 12),
                 Text(
                   'Error al descargar',
-                  style: TextStyle(color: Colors.red[300], fontSize: 14),
+                  style: TextStyle(color: Colors.red[300], fontSize: 13),
                 ),
                 const SizedBox(height: 4),
                 Text(

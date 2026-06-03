@@ -35,7 +35,7 @@ class _ModelSelectorScreenState extends State<ModelSelectorScreen> {
                 )),
             const SizedBox(height: 4),
             Text('Se descargará al iniciar',
-                style: TextStyle(color: theme.secondaryText, fontSize: 12)),
+                style: TextStyle(color: theme.secondaryText, fontSize: 13)),
             const SizedBox(height: 24),
             Expanded(
               child: ListView.separated(
@@ -71,7 +71,7 @@ class _ModelSelectorScreenState extends State<ModelSelectorScreen> {
                           Expanded(
                             child: Text(model.name,
                                 style: TextStyle(
-                                    color: theme.primaryText, fontSize: 14)),
+                                    color: theme.primaryText, fontSize: 13)),
                           ),
                         ],
                       ),
@@ -83,7 +83,7 @@ class _ModelSelectorScreenState extends State<ModelSelectorScreen> {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              height: 44,
+              height: 36,
               child: ElevatedButton(
                 onPressed: () {
                   final model = availableModels[_selected];
@@ -106,10 +106,9 @@ class _ModelSelectorScreenState extends State<ModelSelectorScreen> {
                   ),
                 ),
                 child: const Text('Siguiente',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               ),
             ),
-            const SizedBox(height: 16),
           ],
         ),
       ),

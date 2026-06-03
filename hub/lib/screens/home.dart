@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:syncfusion_flutter_gauges/gauges.dart';
 import '../services/theme_service.dart';
 import '../services/state.dart';
 import '../services/rtc_service.dart';
@@ -92,12 +93,12 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _agentRow(ThemeService theme, StateService state) {
-    final cfg = llmService.modelConfig;
-    final modelName = cfg?.name ?? 'Loading...';
-    final quant = cfg?.quantization;
-    final ctx = cfg?.contextSize;
-    final size = cfg?.fileSize;
-    final mem = state.physicalBytes;
+    // final cfg = llmService.modelConfig;
+    // final modelName = cfg?.name ?? 'Loading...';
+    // final quant = cfg?.quantization;
+    // final ctx = cfg?.contextSize;
+    // final size = cfg?.fileSize;
+    // final mem = state.physicalBytes;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -106,22 +107,69 @@ class HomeScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                AppIcon(size: 16),
-                const SizedBox(width: 8),
-                Text('Agent', style: TextStyle(color: theme.primaryText, fontSize: 11, fontWeight: FontWeight.w600)),
-              ],
+            // Row(
+            //   children: [
+            //     AppIcon(size: 16),
+            //     const SizedBox(width: 8),
+            //     Text('Agent', style: TextStyle(color: theme.primaryText, fontSize: 11, fontWeight: FontWeight.w600)),
+            //   ],
+            // ),
+            // const SizedBox(height: 4),
+            // _infoRow(theme, 'Model:', modelName),
+            // if (quant != null) _infoRow(theme, 'Quantized:', quant),
+            // if (ctx != null) _infoRow(theme, 'Context:', _compact(ctx)),
+            // _infoRow(theme, 'Size:', _formatGB(size ?? 0)),
+            // _infoRow(theme, 'RAM:', _formatGB(mem ?? 0)),
+            Expanded(
+              child: Center(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final gaugeSize = (constraints.biggest.shortestSide - 8).clamp(80.0, 500.0);
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: gaugeSize,
+                          height: gaugeSize,
+                          child: SfRadialGauge(
+                            axes: [
+                              RadialAxis(
+                                minimum: 0, maximum: 100,
+                                showLabels: false, showTicks: false,
+                                startAngle: 270, endAngle: 270,
+                                radiusFactor: 0.88,
+                                axisLineStyle: AxisLineStyle(thickness: 8, color: theme.scaffoldBg),
+                                pointers: [RangePointer(value: 88, width: 8, cornerStyle: CornerStyle.bothCurve, enableAnimation: true, color: theme.primaryText)],
+                              ),
+                              RadialAxis(
+                                minimum: 0, maximum: 100,
+                                showLabels: false, showTicks: false,
+                                startAngle: 270, endAngle: 270,
+                                radiusFactor: 0.66,
+                                axisLineStyle: AxisLineStyle(thickness: 8, color: theme.scaffoldBg),
+                                pointers: [RangePointer(value: 42, width: 8, cornerStyle: CornerStyle.bothCurve, enableAnimation: true, color: theme.primaryText)],
+                              ),
+                              RadialAxis(
+                                minimum: 0, maximum: 100,
+                                showLabels: false, showTicks: false,
+                                startAngle: 270, endAngle: 270,
+                                radiusFactor: 0.44,
+                                axisLineStyle: AxisLineStyle(thickness: 8, color: theme.scaffoldBg),
+                                pointers: [RangePointer(value: 67, width: 8, cornerStyle: CornerStyle.bothCurve, enableAnimation: true, color: theme.primaryText)],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Groq - Mistral - Google',
+                            style: TextStyle(color: theme.primaryText, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ],
+                    );
+                  },
+                ),
+              ),
             ),
-            const SizedBox(height: 4),
-            _infoRow(theme, 'Model:', modelName),
-            if (quant != null) _infoRow(theme, 'Quantized:', quant),
-            if (ctx != null) _infoRow(theme, 'Context:', _compact(ctx)),
-            _infoRow(theme, 'Size:', _formatGB(size ?? 0)),
-            _infoRow(theme, 'RAM:', _formatGB(mem ?? 0)),
           ],
         ),
       ),
@@ -151,7 +199,7 @@ class HomeScreen extends StatelessWidget {
 
   Widget _qrCard(ThemeService theme, PeerRTCService rtc) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: theme.inactiveBg,
         borderRadius: BorderRadius.circular(8),
@@ -169,7 +217,7 @@ class HomeScreen extends StatelessWidget {
                 eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: theme.primaryText),
                 dataModuleStyle: QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: theme.primaryText),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               _linkStatusRow(theme, rtc),
             ],
           );
@@ -185,6 +233,6 @@ class HomeScreen extends StatelessWidget {
       PeerStatus.answered => 'Connected',
       PeerStatus.connected => 'Connected',
     };
-    return Text('Link $label', style: TextStyle(color: theme.primaryText, fontSize: 10, fontWeight: FontWeight.bold));
+    return Text('Link - $label', style: TextStyle(color: theme.primaryText, fontSize: 10, fontWeight: FontWeight.bold));
   }
 }

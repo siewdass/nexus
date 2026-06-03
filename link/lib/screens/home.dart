@@ -9,10 +9,9 @@ import '../services/beep.dart';
 import '../services/notifications.dart';
 import '../services/wake.dart';
 import '../services/tts.dart';
-import '../services/network.dart';
-import '../services/scanner.dart';
 import '../services/stt.dart';
 import '../services/theme_service.dart';
+import '../services/rtc_client.dart';
 import 'settings.dart';
 
 class _Interaction {
@@ -38,7 +37,6 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   final _detector = WakeService();
   StreamSubscription<AudioDataContainer>? _audioStream;
-  StreamSubscription<void>? _disconnectSub;
   final _bgService = FlutterBackgroundService();
 
   final List<_Interaction> _interactions = [];
@@ -87,48 +85,14 @@ class _HomeState extends State<Home> {
     _recording = false;
   }
 
-  Future<void> _connect(ScanResult scan) async {
-    if (scan.public.isNotEmpty) {
-      final parts = scan.public.split(':');
-      final host = parts[0];
-      final port = parts.length > 1 ? int.parse(parts[1]) : 5001;
-      try {
-        await networkService.connect(host: host, port: port);
-        return;
-      } catch (_) {}
-    }
-    await networkService.connect(host: scan.private, port: 5001);
-  }
-
-  Future<void> _tryReconnect() async {
-    final scan = await Scanner.discover(timeout: const Duration(seconds: 2));
-    if (scan != null && mounted) {
-      try {
-        await _connect(scan);
-      } catch (_) {}
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-
-    _disconnectSub = networkService.onDisconnect.listen((_) {
-      _tryReconnect();
-    });
 
     _detector.onReady = () async {
       await _tts.init();
       await _stt.init();
       setState(() => _modelsReady = true);
-      if (!networkService.isConnected) {
-        final scan = Scanner.lastResult;
-        if (scan != null) {
-          try {
-            await _connect(scan);
-          } catch (_) {}
-        }
-      }
     };
     _detector.onFirstPrediction = () {
       if (_isStarting) {
@@ -148,20 +112,9 @@ class _HomeState extends State<Home> {
         _nexusDetected = true;
       });
 
-      // await showDetectionNotification(score);
-
-      if (!networkService.isConnected) {
-        final scan = Scanner.lastResult;
-        if (scan == null) {
-          _finishConversation();
-          return;
-        }
-        try {
-          await _connect(scan);
-        } catch (_) {
-          _finishConversation();
-          return;
-        }
+      if (!rtcClient.isConnected) {
+        _finishConversation();
+        return;
       }
 
       await Future.delayed(const Duration(milliseconds: 500));
@@ -182,6 +135,11 @@ class _HomeState extends State<Home> {
   }
 
   void _startSttPhase() {
+    if (!_stt.isInitialized) {
+      debugPrint('[HOME] STT not ready, finishing');
+      _finishConversation();
+      return;
+    }
     debugPrint('[HOME] STT phase');
     _stt.start().then((text) {
       if (text != null && text.isNotEmpty) {
@@ -217,18 +175,18 @@ class _HomeState extends State<Home> {
     StreamSubscription doneSub;
     StreamSubscription errSub;
 
-    tokenSub = networkService.tokens.listen((t) => buffer.write(t));
-    thinkSub = networkService.think.listen((t) {
+    tokenSub = rtcClient.tokens.listen((t) => buffer.write(t));
+    thinkSub = rtcClient.think.listen((t) {
       setState(() => interaction.think += t);
     });
-    doneSub = networkService.done.listen((_) {
+    doneSub = rtcClient.done.listen((_) {
       if (!completer.isCompleted) completer.complete(buffer.toString());
     });
-    errSub = networkService.errors.listen((e) {
+    errSub = rtcClient.errors.listen((e) {
       if (!completer.isCompleted) completer.completeError(e);
     });
 
-    networkService.sendChat(text);
+    rtcClient.sendChat(text);
 
     try {
       final response =
@@ -308,7 +266,6 @@ class _HomeState extends State<Home> {
     _stopStt();
     _stopRecorder();
     _detector.dispose();
-    _disconnectSub?.cancel();
     super.dispose();
   }
 
@@ -343,7 +300,7 @@ class _HomeState extends State<Home> {
       ),
       body: Column(
         children: [
-          if (!context.watch<NetworkService>().isConnected)
+          if (!context.watch<PeerRTCClient>().isConnected)
             const LinearProgressIndicator(minHeight: 2),
           Expanded(
             child: _interactions.isEmpty && !_modelsReady
@@ -533,7 +490,7 @@ class _InteractionCard extends StatelessWidget {
               fontStyle: FontStyle.italic,
             ),
           ),
-        if (isActive && interaction.response.isEmpty && !context.watch<NetworkService>().isConnected)
+        if (isActive && interaction.response.isEmpty && !context.watch<PeerRTCClient>().isConnected)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: const SizedBox(

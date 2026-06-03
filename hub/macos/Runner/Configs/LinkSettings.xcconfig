@@ -1,3 +1,3 @@
 LIBS_DIR = $(SRCROOT)/../static
 MACOSX_DEPLOYMENT_TARGET = 26.0
-OTHER_LDFLAGS = $(inherited) -rdynamic -Wl,-all_load $(LIBS_DIR)/libllama.a $(LIBS_DIR)/libggml.a $(LIBS_DIR)/libggml-cpu.a $(LIBS_DIR)/libggml-metal.a $(LIBS_DIR)/libggml-blas.a $(LIBS_DIR)/libggml-base.a $(LIBS_DIR)/libbore_ffi.a -lc++ -framework Accelerate -framework Metal -framework Foundation
+OTHER_LDFLAGS = $(inherited) -rdynamic -Wl,-all_load $(LIBS_DIR)/libllama.a $(LIBS_DIR)/libggml.a $(LIBS_DIR)/libggml-cpu.a $(LIBS_DIR)/libggml-metal.a $(LIBS_DIR)/libggml-blas.a $(LIBS_DIR)/libggml-base.a -lc++ -framework Accelerate -framework Metal -framework Foundation

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -55,7 +54,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       }
-    } catch (e, st) {
+    } catch (e) {
       state.setDownloadError('$e');
     }
   }
@@ -87,7 +86,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
                   child: LinearProgressIndicator(
                     value: state.downloadProgress,
                     minHeight: 8,
-                    backgroundColor: theme.secondaryText.withOpacity(0.3),
+                    backgroundColor: theme.secondaryText.withValues(alpha: 0.3),
                     valueColor: AlwaysStoppedAnimation(theme.green),
                   ),
                 ),

@@ -6,9 +6,7 @@ import 'package:syncfusion_flutter_gauges/gauges.dart';
 import '../services/theme_service.dart';
 import '../services/state.dart';
 import '../services/rtc_service.dart';
-import '../services/llm_service.dart';
 import '../widgets/system_stats.dart';
-import '../widgets/app_icon.dart';
 import 'settings.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -161,7 +159,7 @@ class HomeScreen extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         Text('Groq - Mistral - Google',
                             style: TextStyle(color: theme.primaryText, fontSize: 10, fontWeight: FontWeight.bold)),
                       ],
@@ -176,27 +174,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  String _compact(int n) {
-    if (n < 1000) return '$n';
-    if (n < 1000000) return '${(n / 1000).toStringAsFixed(1)}k';
-    if (n < 1000000000) return '${(n / 1000000).toStringAsFixed(1)}M';
-    return '${(n / 1000000000).toStringAsFixed(1)}G';
-  }
-
-  String _formatGB(int bytes) {
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
-
-  Widget _infoRow(ThemeService theme, String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(color: theme.primaryText, fontSize: 10, fontWeight: FontWeight.bold)),
-        Text(value, style: TextStyle(color: theme.primaryText, fontSize: 10)),
-      ],
-    );
-  }
-
   Widget _qrCard(ThemeService theme, PeerRTCService rtc) {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -206,7 +183,7 @@ class HomeScreen extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final qrSize = (constraints.biggest.shortestSide - 16).clamp(80.0, 500.0);
+          final qrSize = (constraints.biggest.shortestSide - 32).clamp(80.0, 500.0);
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

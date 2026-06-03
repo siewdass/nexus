@@ -49,9 +49,9 @@ class _ModelSelectorScreenState extends State<ModelSelectorScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: selected
-                            ? theme.green.withOpacity(0.15)
-                            : theme.inactiveBg,
+                            color: selected
+                                ? theme.green.withValues(alpha: 0.15)
+                                : theme.inactiveBg,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: selected ? theme.green : Colors.transparent,

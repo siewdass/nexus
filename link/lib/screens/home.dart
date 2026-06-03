@@ -6,7 +6,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:provider/provider.dart';
 import '../services/beep.dart';
-import '../services/notifications.dart';
 import '../services/wake.dart';
 import '../services/tts.dart';
 import '../services/stt.dart';

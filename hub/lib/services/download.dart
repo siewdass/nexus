@@ -15,7 +15,7 @@ class ModelDownloader {
       final request = await client.getUrl(Uri.parse(url));
       final response = await request.close();
 
-      final totalLength = response.contentLength ?? -1;
+      final totalLength = response.contentLength;
       final file = File(tmpPath);
       final sink = file.openWrite();
 

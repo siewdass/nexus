@@ -11,7 +11,6 @@ enum LinkPeerStatus { idle, ping, answered, connected }
 
 class PeerRTCClient extends ChangeNotifier {
   String? _uuid;
-  String? _hubPeerId;
   Peer? _peer;
   DataConnection? _connection;
   StreamSubscription<DocumentSnapshot>? _firestoreSub;
@@ -217,7 +216,6 @@ class PeerRTCClient extends ChangeNotifier {
     _peer = null;
     _connection = null;
     _uuid = null;
-    _hubPeerId = null;
     _status = LinkPeerStatus.idle;
     _reconnectAttempts = 0;
     _reconnecting = false;

@@ -8,7 +8,6 @@ import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 
 import 'screens/api_token_screen.dart';
 import 'screens/home.dart';
-import 'screens/model_selector_screen.dart';
 import 'services/api_tokens.dart';
 import 'services/state.dart';
 import 'services/theme_service.dart';
@@ -67,13 +66,10 @@ void main() async {
   final theme = ThemeService();
   await theme.load();
 
-  final apiTokens = ApiTokenService();
-  await apiTokens.load();
+  await apiTokenService.load();
 
-  final initialScreen = apiTokens.ready
-      ? existingModel != null
-          ? const HomeScreen()
-          : ModelSelectorScreen(modelsDir: modelsDir.path)
+  final initialScreen = apiTokenService.ready
+      ? const HomeScreen()
       : ApiTokenScreen(modelsDir: modelsDir.path);
 
   runApp(
@@ -82,7 +78,7 @@ void main() async {
         ChangeNotifierProvider.value(value: hubState),
         ChangeNotifierProvider.value(value: theme),
         ChangeNotifierProvider.value(value: rtcService),
-        ChangeNotifierProvider.value(value: apiTokens),
+        ChangeNotifierProvider.value(value: apiTokenService),
       ],
       child: Consumer<ThemeService>(
         builder: (_, t, __) => MaterialApp(

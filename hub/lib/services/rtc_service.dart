@@ -10,6 +10,9 @@ import 'package:uuid/uuid.dart';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 
 import 'llm_service.dart';
+import 'package:nexus_hub/ai/provider.dart';
+import 'package:nexus_hub/ai/agent.dart';
+import 'api_tokens.dart';
 
 enum PeerStatus { waiting, ping, answered, connected }
 
@@ -116,6 +119,10 @@ class PeerRTCService extends ChangeNotifier {
   }
 
   Future<void> _handleChat(String text) async {
+    await _handleGroq(text, apiTokenService.groqToken!);
+    return;
+    // ignore_for_file: dead_code
+    // local LLM code below kept intact for reference
     if (llmService.engine == null || llmService.modelConfig == null) {
       _connection?.send(jsonEncode({'type': 'error', 'text': 'Engine no inicializado'}));
       debugPrint('[LLM] engine not available');
@@ -189,6 +196,20 @@ class PeerRTCService extends ChangeNotifier {
       _connection?.send(jsonEncode({'type': 'error', 'text': 'Error: $e'}));
     } finally {
       try { await session?.dispose(); } catch (_) {}
+    }
+  }
+
+  Future<void> _handleGroq(String text, String key) async {
+    debugPrint('[GROQ] chat=$text');
+    try {
+      final provider = Provider.auto(apiKey: key, model: 'llama-3.3-70b-versatile');
+      final agent = Agent(provider: provider, tools: []);
+      final response = await agent.run(text);
+      _connection?.send(jsonEncode({'type': 'token', 'text': response}));
+      _connection?.send(jsonEncode({'type': 'done'}));
+    } catch (e, st) {
+      debugPrint('[GROQ] error: $e\n$st');
+      _connection?.send(jsonEncode({'type': 'error', 'text': 'Error: $e'}));
     }
   }
 

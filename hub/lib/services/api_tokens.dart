@@ -67,3 +67,5 @@ class ApiTokenService extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+final apiTokenService = ApiTokenService();

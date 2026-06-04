@@ -1,8 +1,7 @@
 import 'package:langchain/langchain.dart';
 import 'package:langchain_openai/langchain_openai.dart';
-import 'package:langchain_google/langchain_google.dart';
 
-enum ProviderType { groq, mistral, google }
+enum ProviderType { groq, mistral }
 
 class Provider {
   final String apiKey;
@@ -21,7 +20,6 @@ class Provider {
 
   static ProviderType _detect(String key) {
     if (key.startsWith('gsk_')) return ProviderType.groq;
-    if (key.startsWith('AIza')) return ProviderType.google;
     return ProviderType.mistral;
   }
 
@@ -43,14 +41,6 @@ class Provider {
           apiKey: apiKey,
           baseUrl: 'https://api.mistral.ai/v1',
           defaultOptions: ChatOpenAIOptions(
-            model: model,
-            tools: tools.isEmpty ? null : tools,
-          ),
-        );
-      case ProviderType.google:
-        return ChatGoogleGenerativeAI(
-          apiKey: apiKey,
-          defaultOptions: ChatGoogleGenerativeAIOptions(
             model: model,
             tools: tools.isEmpty ? null : tools,
           ),

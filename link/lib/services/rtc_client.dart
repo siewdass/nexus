@@ -19,6 +19,7 @@ class PeerRTCClient extends ChangeNotifier {
   bool _reconnecting = false;
   int _reconnectAttempts = 0;
   static const _maxReconnectAttempts = 10;
+  String? _currentPeerId;
 
   final _tokenController = StreamController<String>.broadcast();
   final _thinkController = StreamController<String>.broadcast();
@@ -66,6 +67,30 @@ class PeerRTCClient extends ChangeNotifier {
       _peerOpenSub = _peer!.onOpen.listen((_) {
         _connectToHub(uuid);
       });
+
+      _firestoreSub = FirebaseFirestore.instance
+          .collection('connections')
+          .doc(uuid)
+          .snapshots()
+          .listen((snap) {
+        if (!snap.exists) return;
+        final data = snap.data() as Map<String, dynamic>;
+        final newPeerId = data['peer_id'] as String?;
+        final status = data['status'] as String?;
+        debugPrint('[RTC_CLIENT] firestore update: status=$status peer_id=$newPeerId current=$_currentPeerId');
+        if (newPeerId != null &&
+            newPeerId.isNotEmpty &&
+            _currentPeerId != null &&
+            newPeerId != _currentPeerId &&
+            _status == LinkPeerStatus.connected) {
+          debugPrint('[RTC_CLIENT] hub restarted, reconnecting...');
+          _connection?.close();
+          _connection = null;
+          _status = LinkPeerStatus.idle;
+          notifyListeners();
+          _autoReconnect();
+        }
+      });
     } catch (e, st) {
       debugPrint('[RTC_CLIENT] connect error: $e\n$st');
       _errorController.add('Conexión: $e');
@@ -101,15 +126,18 @@ class PeerRTCClient extends ChangeNotifier {
       }
 
       debugPrint('[RTC_CLIENT] hub peer_id: $hubPeerId');
+      _currentPeerId = hubPeerId;
       _status = LinkPeerStatus.connecting;
       notifyListeners();
       _updateNotification('Conectando al Hub...');
 
       _connection?.close();
       _connection = _peer!.connect(hubPeerId);
+      var connOpened = false;
 
       _connection!.onOpen.listen((_) {
         debugPrint('[RTC_CLIENT] data channel open');
+        connOpened = true;
         _status = LinkPeerStatus.connected;
         notifyListeners();
         _updateNotification('Conectado');
@@ -118,6 +146,14 @@ class PeerRTCClient extends ChangeNotifier {
       _connection!.onData.listen((data) {
         debugPrint('[RTC_CLIENT] data: $data');
         _handleData(data);
+      });
+
+      _connection!.onError.listen((err) {
+        debugPrint('[RTC_CLIENT] connection error: $err');
+        _status = LinkPeerStatus.idle;
+        _connection = null;
+        notifyListeners();
+        Future.delayed(const Duration(seconds: 2), () => _autoReconnect());
       });
 
       _connection!.onClose.listen((_) {
@@ -131,6 +167,17 @@ class PeerRTCClient extends ChangeNotifier {
         }
         _updateNotification('Reconectando...');
         _autoReconnect();
+      });
+
+      Future.delayed(const Duration(seconds: 10), () {
+        if (!connOpened && _connection != null) {
+          debugPrint('[RTC_CLIENT] connection timeout, retrying...');
+          _connection?.close();
+          _connection = null;
+          _status = LinkPeerStatus.idle;
+          notifyListeners();
+          _autoReconnect();
+        }
       });
     } catch (e, st) {
       debugPrint('[RTC_CLIENT] connect to hub error: $e\n$st');
@@ -243,6 +290,7 @@ class PeerRTCClient extends ChangeNotifier {
     _status = LinkPeerStatus.idle;
     _reconnectAttempts = 0;
     _reconnecting = false;
+    _currentPeerId = null;
     _updateNotification('Escuchando...');
     notifyListeners();
   }

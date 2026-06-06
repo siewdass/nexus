@@ -40,8 +40,8 @@ final createTaskTool = Tool(
   },
   execute: (args) async {
     args['status'] = 'open';
-    await databaseService.create('tasks', args);
-    return 'Tarea creada correctamente';
+    final id = await databaseService.create('tasks', args);
+    return 'Tarea creada correctamente con id: $id. Usá este id como task_id para criterios.';
   },
 );
 
@@ -89,7 +89,7 @@ final listTasksTool = Tool(
     if (args.containsKey('status')) filter['status'] = args['status'];
     final tasks = await databaseService.read('tasks', filter, many: true) as List;
     if (tasks.isEmpty) return 'No hay tareas guardadas';
-    return tasks.map((t) => '- ${t['title']} (${t['id']})').join('\n');
+    return tasks.map((t) => '- ${t['title']} (id: ${t['id']}) [${t['status'] ?? "open"}]').join('\n');
   },
 );
 
@@ -121,11 +121,24 @@ final createCriteriaTool = Tool(
     'required': ['task_id', 'description'],
   },
   execute: (args) async {
-    debugPrint('[CRITERIA] create_criteria called with args: $args');
+    debugPrint('[CRITERIA] ===== create_criteria =====');
+    debugPrint('[CRITERIA] args received: $args');
+    debugPrint('[CRITERIA] task_id: ${args["task_id"]}');
+    debugPrint('[CRITERIA] description: ${args["description"]}');
+    debugPrint('[CRITERIA] all keys: ${args.keys}');
     args['status'] = 'pending';
-    await databaseService.create('criteria', args);
-    debugPrint('[CRITERIA] created successfully');
-    return 'Criterio de aceptación creado correctamente';
+    try {
+      final id = await databaseService.create('criteria', args);
+      debugPrint('[CRITERIA] created with id: $id');
+      debugPrint('[CRITERIA] args after create: $args');
+      debugPrint('[CRITERIA] ===== create_criteria OK =====');
+      return 'Criterio de aceptación creado correctamente con id: $id';
+    } catch (e, st) {
+      debugPrint('[CRITERIA] ERROR: $e');
+      debugPrint('[CRITERIA] stack: $st');
+      debugPrint('[CRITERIA] ===== create_criteria FAIL =====');
+      return 'Error al crear criterio: $e';
+    }
   },
 );
 
@@ -182,6 +195,6 @@ final listCriteriaTool = Tool(
     if (args.containsKey('task_id')) filter['task_id'] = args['task_id'];
     final criteria = await databaseService.read('criteria', filter, many: true) as List;
     if (criteria.isEmpty) return 'No hay criterios de aceptación';
-    return criteria.map((c) => '- ${c['description']} [${c['status']}]').join('\n');
+    return criteria.map((c) => '- ${c['description']} (id: ${c['id']}) [${c['status']}]').join('\n');
   },
 );

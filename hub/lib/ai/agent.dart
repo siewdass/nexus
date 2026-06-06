@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:langchain/langchain.dart' hide Tool;
 import 'provider.dart';
 import 'tool.dart';
@@ -35,8 +36,10 @@ class Agent {
       messages.add(msg);
 
       for (final tc in msg.toolCalls) {
+        debugPrint('[AGENT] calling tool: ${tc.name}(${tc.arguments})');
         final tool = tools.firstWhere((t) => t.name == tc.name);
         final toolResult = await tool.execute(tc.arguments);
+        debugPrint('[AGENT] tool result: $toolResult');
         messages.add(ChatMessage.tool(
           toolCallId: tc.id,
           content: toolResult,

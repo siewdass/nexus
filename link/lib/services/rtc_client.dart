@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:peer_rtc/peer_rtc.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 
-enum LinkPeerStatus { idle, ping, answered, connected }
+enum LinkPeerStatus { idle, finding, connecting, connected }
 
 class PeerRTCClient extends ChangeNotifier {
   String? _uuid;
@@ -24,24 +24,30 @@ class PeerRTCClient extends ChangeNotifier {
   final _thinkController = StreamController<String>.broadcast();
   final _doneController = StreamController<void>.broadcast();
   final _errorController = StreamController<String>.broadcast();
+  final _tasksController = StreamController<List<Map<String, dynamic>>>.broadcast();
+  final _taskAddedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _taskUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _taskRemovedController = StreamController<Map<String, dynamic>>.broadcast();
   bool _pendingChat = false;
 
   Stream<String> get tokens => _tokenController.stream;
   Stream<String> get think => _thinkController.stream;
   Stream<void> get done => _doneController.stream;
   Stream<String> get errors => _errorController.stream;
+  Stream<List<Map<String, dynamic>>> get tasks => _tasksController.stream;
+  Stream<Map<String, dynamic>> get taskAdded => _taskAddedController.stream;
+  Stream<Map<String, dynamic>> get taskUpdated => _taskUpdatedController.stream;
+  Stream<Map<String, dynamic>> get taskRemoved => _taskRemovedController.stream;
 
   String? get uuid => _uuid;
   LinkPeerStatus get status => _status;
-  bool get isConnected =>
-      _status == LinkPeerStatus.answered ||
-      _status == LinkPeerStatus.connected;
+  bool get isConnected => _status == LinkPeerStatus.connected;
 
   Future<void> connect(String uuid) async {
     _uuid = uuid;
-    _status = LinkPeerStatus.ping;
+    _status = LinkPeerStatus.finding;
     notifyListeners();
-    _updateNotification('Conectando...');
+    _updateNotification('Buscando Hub...');
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('hub_uuid', uuid);
@@ -95,6 +101,9 @@ class PeerRTCClient extends ChangeNotifier {
       }
 
       debugPrint('[RTC_CLIENT] hub peer_id: $hubPeerId');
+      _status = LinkPeerStatus.connecting;
+      notifyListeners();
+      _updateNotification('Conectando al Hub...');
 
       _connection?.close();
       _connection = _peer!.connect(hubPeerId);
@@ -143,6 +152,14 @@ class PeerRTCClient extends ChangeNotifier {
         case 'error':
           _pendingChat = false;
           _errorController.add(msg['text'] as String? ?? 'Error desconocido');
+        case 'tasks':
+          _tasksController.add((msg['data'] as List).cast<Map<String, dynamic>>());
+        case 'task_added':
+          _taskAddedController.add(Map<String, dynamic>.from(msg['data']));
+        case 'task_updated':
+          _taskUpdatedController.add(Map<String, dynamic>.from(msg['data']));
+        case 'task_removed':
+          _taskRemovedController.add(Map<String, dynamic>.from(msg['data']));
       }
     } catch (e) {
       debugPrint('[RTC_CLIENT] failed to parse: $e');
@@ -161,6 +178,13 @@ class PeerRTCClient extends ChangeNotifier {
       _pendingChat = false;
       _errorController.add('Error al enviar: $e');
     }
+  }
+
+  Future<void> sendListTasks() async {
+    if (_connection == null) return;
+    try {
+      _connection!.send(jsonEncode({'type': 'list_tasks'}));
+    } catch (_) {}
   }
 
   Future<void> sendMessage(String text) async {
@@ -236,6 +260,10 @@ class PeerRTCClient extends ChangeNotifier {
     _thinkController.close();
     _doneController.close();
     _errorController.close();
+    _tasksController.close();
+    _taskAddedController.close();
+    _taskUpdatedController.close();
+    _taskRemovedController.close();
     super.dispose();
   }
 }

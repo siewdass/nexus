@@ -11,18 +11,7 @@ import '../services/tts.dart';
 import '../services/stt.dart';
 import '../services/theme_service.dart';
 import '../services/rtc_client.dart';
-import '../widgets/app_icon.dart';
 import 'settings.dart';
-
-class _Interaction {
-  String query;
-  String think;
-  String response;
-  _Interaction()
-      : query = '',
-        think = '',
-        response = '';
-}
 
 final _tts = TtsService();
 final _stt = SttService();
@@ -39,14 +28,10 @@ class _HomeState extends State<Home> {
   StreamSubscription<AudioDataContainer>? _audioStream;
   final _bgService = FlutterBackgroundService();
 
-  final List<_Interaction> _interactions = [];
   bool _listening = false;
   bool _nexusDetected = false;
   bool _isStarting = false;
   bool _recording = false;
-  bool _modelsReady = false;
-  int _speakingIndex = -1;
-  int? _expandedThinkIndex;
 
   static const _sampleRate = 16000;
 
@@ -92,7 +77,6 @@ class _HomeState extends State<Home> {
     _detector.onReady = () async {
       await _tts.init();
       await _stt.init();
-      setState(() => _modelsReady = true);
     };
     _detector.onFirstPrediction = () {
       if (_isStarting) {
@@ -125,13 +109,11 @@ class _HomeState extends State<Home> {
     _detector.loadModels();
   }
 
-  Future<void> _speakResponse(int index, String text) async {
+  Future<void> _speakResponse(String text) async {
     if (text.isEmpty) return;
-    setState(() => _speakingIndex = index);
     try {
       await _tts.speakAndWait(text);
     } catch (_) {}
-    setState(() => _speakingIndex = -1);
   }
 
   void _startSttPhase() {
@@ -164,21 +146,14 @@ class _HomeState extends State<Home> {
 
   Future<void> _handleQuery(String text) async {
     debugPrint('[HOME] _handleQuery: "$text"');
-    final interaction = _Interaction();
-    interaction.query = text;
-    setState(() => _interactions.add(interaction));
 
     final buffer = StringBuffer();
     final completer = Completer<String>();
     StreamSubscription tokenSub;
-    StreamSubscription thinkSub;
     StreamSubscription doneSub;
     StreamSubscription errSub;
 
     tokenSub = rtcClient.tokens.listen((t) => buffer.write(t));
-    thinkSub = rtcClient.think.listen((t) {
-      setState(() => interaction.think += t);
-    });
     doneSub = rtcClient.done.listen((_) {
       if (!completer.isCompleted) completer.complete(buffer.toString());
     });
@@ -190,16 +165,34 @@ class _HomeState extends State<Home> {
 
     try {
       final response =
-          await completer.future.timeout(const Duration(seconds: 15));
-      setState(() => interaction.response = response);
-      await _tts.speakAndWait(response);
+          await completer.future.timeout(const Duration(seconds: 60));
+      debugPrint('[HOME] response: $response');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response),
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      await _speakResponse(response);
       _finishConversation();
     } catch (e) {
-      setState(() => interaction.response = 'Error: $e');
+      debugPrint('[HOME] error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
       _finishConversation();
     } finally {
       tokenSub.cancel();
-      thinkSub.cancel();
       doneSub.cancel();
       errSub.cancel();
     }
@@ -291,19 +284,24 @@ class _HomeState extends State<Home> {
               theme.isDark ? Brightness.light : Brightness.dark,
           statusBarColor: theme.sidebarBg,
         ),
-        title: const Text('Nexus Link'),
         backgroundColor: theme.sidebarBg,
         foregroundColor: theme.primaryText,
+        title: const Text('Nexus Link'),
         actions: [
+          IconButton(
+            icon: Icon(Icons.refresh, color: theme.primaryText),
+            tooltip: 'Recargar tareas',
+            onPressed: rtcClient.sendListTasks,
+          ),
           IconButton(
             icon: Icon(Icons.settings, color: theme.primaryText),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
       floatingActionButton: _Fab(
         isConnected: context.watch<PeerRTCClient>().isConnected,
         listening: _listening,
@@ -316,39 +314,13 @@ class _HomeState extends State<Home> {
           if (!context.watch<PeerRTCClient>().isConnected)
             const LinearProgressIndicator(minHeight: 2),
           Expanded(
-            child: _interactions.isEmpty && !_modelsReady
-                ? const Center(child: AppIcon(size: 80))
-                : _interactions.isEmpty
-                    ? Center(
-                        child: AppIcon(size: 80),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _interactions.length,
-                        itemBuilder: (context, index) {
-                          final item = _interactions[index];
-                          final isLast = index == _interactions.length - 1;
-                          return _InteractionCard(
-                            interaction: item,
-                            isActive: isLast && _nexusDetected,
-                            isSpeaking: _speakingIndex == index,
-                            isThinkExpanded: _expandedThinkIndex == index,
-                            onToggleThink: () {
-                              setState(() {
-                                _expandedThinkIndex =
-                                    _expandedThinkIndex == index ? null : index;
-                              });
-                            },
-                            onPlay: () => _speakResponse(index, item.response),
-                          );
-                        },
-                      ),
+            child: _TasksTab(theme: theme),
           ),
         ],
       ),
-      );
-    }  // build
-}  // _HomeState
+    );
+  }
+}
 
 class _Fab extends StatelessWidget {
   final bool isConnected;
@@ -398,163 +370,253 @@ class _Fab extends StatelessWidget {
   }
 }
 
-class _TextCard extends StatelessWidget {
-  final String text;
-  final bool isPlaying;
-  final VoidCallback? onPlay;
-  final Widget? trailing;
+Color _statusColor(String status) {
+  switch (status) {
+    case 'open': return const Color(0xFF7890B0);
+    case 'approved': return const Color(0xFF34B77A);
+    case 'building': return const Color(0xFFE8A838);
+    case 'built': return const Color(0xFF5AC88C);
+    case 'review': return const Color(0xFF9B59B6);
+    case 'testing': return const Color(0xFFF1C40F);
+    case 'tested': return const Color(0xFF2ECC71);
+    case 'reopened': return const Color(0xFFBE2828);
+    case 'closed': return const Color(0xFF888888);
+    default: return const Color(0xFF888888);
+  }
+}
 
-  const _TextCard({
-    required this.text,
-    this.isPlaying = false,
-    this.onPlay,
-    this.trailing,
-  });
+class _TasksTab extends StatefulWidget {
+  final ThemeService theme;
+  const _TasksTab({required this.theme});
+
+  @override
+  State<_TasksTab> createState() => _TasksTabState();
+}
+
+class _TasksTabState extends State<_TasksTab> {
+  List<Map<String, dynamic>> _tasks = [];
+  int? _expandedIndex;
+  StreamSubscription? _tasksSub;
+  StreamSubscription? _addedSub;
+  StreamSubscription? _updatedSub;
+  StreamSubscription? _removedSub;
+
+  @override
+  void initState() {
+    super.initState();
+    rtcClient.sendListTasks();
+    _tasksSub = rtcClient.tasks.listen((tasks) {
+      if (mounted) setState(() => _tasks = tasks);
+    });
+    _addedSub = rtcClient.taskAdded.listen((task) {
+      if (mounted) setState(() => _tasks.add(task));
+    });
+    _updatedSub = rtcClient.taskUpdated.listen((task) {
+      if (mounted) setState(() {
+        final idx = _tasks.indexWhere((t) => t['id'] == task['id']);
+        if (idx >= 0) _tasks[idx] = task;
+      });
+    });
+    _removedSub = rtcClient.taskRemoved.listen((data) {
+      if (mounted) setState(() {
+        _tasks.removeWhere((t) => t['id'] == data['id']);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _tasksSub?.cancel();
+    _addedSub?.cancel();
+    _updatedSub?.cancel();
+    _removedSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.watch<ThemeService>();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SelectableText(
-          text,
+    if (_tasks.isEmpty) {
+      return Center(
+        child: Text(
+          'Sin tareas',
           style: TextStyle(
-            fontSize: 12,
-            color: theme.primaryText,
-            fontStyle: FontStyle.italic,
+            fontSize: 13,
+            color: widget.theme.secondaryText,
           ),
         ),
-        const SizedBox(height: 4),
-        Row(
-          mainAxisSize: MainAxisSize.min,
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      itemCount: _tasks.length,
+      itemBuilder: (context, index) {
+        final task = _tasks[index];
+        final title = task['title'] as String? ?? 'Sin título';
+        final status = task['status'] as String? ?? 'open';
+        final description = task['description'] as String?;
+        final color = _statusColor(status);
+        final isExpanded = _expandedIndex == index;
+        final criteria = task['criteria'] as List?;
+        if (criteria != null && criteria.isNotEmpty) {
+          debugPrint('[TASKS] showing ${criteria.length} criteria for task ${task['id']}');
+        }
+
+        return Column(
           children: [
-            InkWell(
-              onTap: () => Clipboard.setData(ClipboardData(text: text)),
-              child: Padding(
-                padding: const EdgeInsets.all(2),
-                child: Icon(Icons.content_copy, size: 14, color: theme.secondaryText),
+            if (index > 0) const Divider(height: 1, indent: 16, endIndent: 16),
+            ExpansionTile(
+              key: ValueKey('${task['id']}_$isExpanded'),
+              tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              initiallyExpanded: isExpanded,
+              onExpansionChanged: (expanded) {
+                setState(() => _expandedIndex = expanded ? index : null);
+              },
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+                side: BorderSide.none,
               ),
-            ),
-            if (onPlay != null)
-              isPlaying
-                  ? const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+              collapsedShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+                side: BorderSide.none,
+              ),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: widget.theme.primaryText,
                       ),
-                    )
-                  : InkWell(
-                      onTap: onPlay,
-                      child: Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: Icon(Icons.volume_up,
-                            size: 14, color: theme.secondaryText),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    status,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              children: [
+                if (description != null && description.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        description,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: widget.theme.secondaryText,
+                        ),
                       ),
                     ),
-            if (trailing != null) const SizedBox(width: 4),
-            if (trailing != null) trailing!,
+                  ),
+                if (criteria != null && criteria.isNotEmpty)
+                  _CriteriaTimeline(
+                    criteria: criteria,
+                    theme: widget.theme,
+                  ),
+              ],
+            ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 }
 
-class _InteractionCard extends StatelessWidget {
-  final _Interaction interaction;
-  final bool isActive;
-  final bool isSpeaking;
-  final bool isThinkExpanded;
-  final VoidCallback? onToggleThink;
-  final VoidCallback? onPlay;
+class _CriteriaTimeline extends StatelessWidget {
+  final List criteria;
+  final ThemeService theme;
 
-  const _InteractionCard({
-    required this.interaction,
-    this.isActive = false,
-    this.isSpeaking = false,
-    this.isThinkExpanded = false,
-    this.onToggleThink,
-    this.onPlay,
+  const _CriteriaTimeline({
+    required this.criteria,
+    required this.theme,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.watch<ThemeService>();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (interaction.query.isNotEmpty)
-          Align(
-            alignment: Alignment.centerRight,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Criterios de aceptación',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: theme.primaryText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          for (var i = 0; i < criteria.length; i++)
+            _buildCriteriaItem(criteria[i] as Map<String, dynamic>, i),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCriteriaItem(Map<String, dynamic> criterion, int index) {
+    final status = criterion['status'] as String? ?? 'pending';
+    final description = criterion['description'] as String? ?? '';
+    final isLast = index == criteria.length - 1;
+
+    Color dotColor;
+    IconData icon;
+    switch (status) {
+      case 'passed':
+        dotColor = const Color(0xFF2ECC71);
+        icon = Icons.check_circle;
+      case 'failed':
+        dotColor = const Color(0xFFE74C3C);
+        icon = Icons.cancel;
+      default:
+        dotColor = const Color(0xFF7890B0);
+        icon = Icons.circle;
+    }
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 16,
+            child: Column(
+              children: [
+                Icon(icon, size: 12, color: dotColor),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 1,
+                      color: theme.secondaryText.withAlpha(60),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: SelectableText(
-                interaction.query,
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 4),
+              child: Text(
+                description,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: theme.secondaryText,
-                  fontStyle: FontStyle.italic,
-                ),
                 ),
               ),
             ),
-        if (interaction.response.isEmpty && interaction.think.isNotEmpty)
-          SelectableText(
-            interaction.think,
-            style: TextStyle(
-              fontSize: 12,
-              color: theme.primaryText,
-              fontStyle: FontStyle.italic,
-            ),
           ),
-        if (isActive && interaction.response.isEmpty && !context.watch<PeerRTCClient>().isConnected)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.orange),
-            ),
-          ),
-        if (isThinkExpanded &&
-            interaction.think.isNotEmpty &&
-            interaction.response.isNotEmpty)
-          SelectableText(
-            interaction.think,
-            style: TextStyle(
-              fontSize: 12,
-              color: theme.primaryText,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        if (interaction.response.isNotEmpty)
-          _TextCard(
-            text: interaction.response,
-            onPlay: onPlay,
-            isPlaying: isSpeaking,
-            trailing: interaction.think.isNotEmpty
-                ? InkWell(
-                    onTap: () => onToggleThink?.call(),
-                    child: Tooltip(
-                      message: 'Razonamiento',
-                      child: Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: Icon(
-                          isThinkExpanded
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          size: 14,
-                          color: theme.secondaryText,
-                        ),
-                      ),
-                    ),
-                  )
-                : null,
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

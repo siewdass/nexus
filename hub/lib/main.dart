@@ -14,6 +14,7 @@ import 'services/theme_service.dart';
 import 'services/rtc_service.dart';
 import 'services/tray_service.dart';
 import 'services/llm_service.dart';
+import 'services/database.dart';
 
 final trayService = TrayService();
 
@@ -42,12 +43,12 @@ void main() async {
     hubState.markLlmReady();
   }
 
+  await databaseService.open(path: '$homeDir/.nexus_hub', filename: 'nexus.db');
+
   await windowManager.ensureInitialized();
-  windowManager.waitUntilReadyToShow().then((_) {
-    windowManager.setSize(const Size(540, 400));
-    windowManager.setTitle('Nexus Hub');
-    windowManager.setTitleBarStyle(TitleBarStyle.hidden);
-  });
+  await windowManager.setSize(const Size(540, 400));
+  await windowManager.setTitle('Nexus Hub');
+  await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
 
   await Firebase.initializeApp(
     options: const FirebaseOptions(
@@ -89,6 +90,4 @@ void main() async {
     ),
   );
 
-  await windowManager.show();
-  await windowManager.focus();
 }

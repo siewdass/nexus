@@ -1,18 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:peer_rtc/peer_rtc.dart';
 import 'package:uuid/uuid.dart';
-import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 
-import 'llm_service.dart';
 import 'package:nexus_hub/ai/provider.dart';
 import 'package:nexus_hub/ai/agent.dart';
+import 'package:nexus_hub/ai/tool.dart';
+import 'package:nexus_hub/ai/mistral.dart';
 import 'api_tokens.dart';
+import 'database.dart';
 
 enum PeerStatus { waiting, ping, answered, connected }
 
@@ -51,6 +51,7 @@ class PeerRTCService extends ChangeNotifier {
       _peer = Peer(
         options: PeerOptions(
           debug: LogLevel.Warnings,
+          autoReconnect: true,
         ),
       );
 
@@ -85,8 +86,11 @@ class PeerRTCService extends ChangeNotifier {
           debugPrint('[RTC] data: $data');
           try {
             final msg = jsonDecode(data as String) as Map<String, dynamic>;
-            if (msg['type'] == 'chat' && msg['text'] != null) {
-              _handleChat(msg['text'] as String);
+            switch (msg['type'] as String?) {
+              case 'chat':
+                if (msg['text'] != null) _handleChat(msg['text'] as String);
+              case 'list_tasks':
+                _handleListTasks();
             }
           } catch (e) {
             debugPrint('[RTC] failed to parse message: $e');
@@ -119,98 +123,116 @@ class PeerRTCService extends ChangeNotifier {
   }
 
   Future<void> _handleChat(String text) async {
-    await _handleGroq(text, apiTokenService.groqToken!);
-    return;
-    // ignore_for_file: dead_code
-    // local LLM code below kept intact for reference
-    if (llmService.engine == null || llmService.modelConfig == null) {
-      _connection?.send(jsonEncode({'type': 'error', 'text': 'Engine no inicializado'}));
-      debugPrint('[LLM] engine not available');
+    debugPrint('[RTC] _handleChat text="$text"');
+    final key = apiTokenService.mistralToken;
+    if (key == null) {
+      debugPrint('[MISTRAL] ERROR: mistralToken is null');
+      _connection?.send(jsonEncode({'type': 'error', 'text': 'Mistral key no encontrada'}));
       return;
     }
-    EngineSession? session;
+    debugPrint('[RTC] calling _handleMistral');
+    await _handleMistral(text, key);
+    debugPrint('[RTC] _handleMistral completed');
+  }
+
+  Future<void> _handleMistral(String text, String key) async {
+    debugPrint('[MISTRAL] start chat=$text model=$mistralModel');
+    List<Map<String, dynamic>> beforeTasks;
     try {
-      final cfg = llmService.modelConfig!;
-      final prompt = cfg.promptFormat.build(cfg.systemPrompt, text);
-      session = await llmService.engine!.createSession();
-      debugPrint('[LLM] modelo=${cfg.name} chat=$text');
+      beforeTasks = await _getAllTasks();
+      debugPrint('[MISTRAL] beforeTasks count=${beforeTasks.length}');
+    } catch (e) {
+      debugPrint('[MISTRAL] beforeTasks error: $e');
+      beforeTasks = [];
+    }
 
-      var inThink = false;
-      var buf = '';
-
-      await for (final event in session.generate(
-        prompt: prompt,
-        addSpecial: true,
-        parseSpecial: true,
-        sampler: cfg.sampler,
-        maxTokens: cfg.maxTokens,
-      )) {
-        if (event is TokenEvent) {
-          stdout.write(event.text);
-          stdout.flush();
-          buf += event.text;
-          if (cfg.thinkStart != null && cfg.thinkEnd != null) {
-            while (buf.isNotEmpty) {
-              if (!inThink) {
-                final idx = buf.indexOf(cfg.thinkStart!);
-                if (idx < 0) {
-                  _connection?.send(jsonEncode({'type': 'token', 'text': buf}));
-                  buf = '';
-                  break;
-                }
-                if (idx > 0) {
-                  _connection?.send(jsonEncode({'type': 'token', 'text': buf.substring(0, idx)}));
-                }
-                buf = buf.substring(idx + cfg.thinkStart!.length);
-                inThink = true;
-              } else {
-                final idx = buf.indexOf(cfg.thinkEnd!);
-                if (idx < 0) {
-                  _connection?.send(jsonEncode({'type': 'think', 'text': buf}));
-                  buf = '';
-                  break;
-                }
-                if (idx > 0) {
-                  _connection?.send(jsonEncode({'type': 'think', 'text': buf.substring(0, idx)}));
-                }
-                buf = buf.substring(idx + cfg.thinkEnd!.length);
-                inThink = false;
-              }
-            }
-          } else {
-            _connection?.send(jsonEncode({'type': 'token', 'text': buf}));
-            buf = '';
-          }
-        }
-      }
-      if (buf.isNotEmpty) {
-        if (cfg.thinkStart != null && cfg.thinkEnd != null && inThink) {
-          _connection?.send(jsonEncode({'type': 'think', 'text': buf}));
-        } else {
-          _connection?.send(jsonEncode({'type': 'token', 'text': buf}));
-        }
-      }
+    try {
+      debugPrint('[MISTRAL] creating provider...');
+      final provider = Provider.auto(apiKey: key, model: mistralModel);
+      debugPrint('[MISTRAL] creating agent...');
+      final agent = Agent(
+        provider: provider,
+        tools: [
+          createTaskTool, updateTaskTool, listTasksTool, deleteTaskTool,
+          createCriteriaTool, updateCriteriaTool, deleteCriteriaTool, listCriteriaTool,
+        ],
+        systemPrompt: mistralSystemPrompt,
+      );
+      debugPrint('[MISTRAL] calling agent.run()...');
+      final response = await agent.run(text);
+      debugPrint('[MISTRAL] agent.run() ok, response length=${response.length}');
+      _connection?.send(jsonEncode({'type': 'token', 'text': response}));
       _connection?.send(jsonEncode({'type': 'done'}));
+      debugPrint('[MISTRAL] response sent to link');
     } catch (e, st) {
-      debugPrint('[LLM] error: $e\n$st');
+      debugPrint('[MISTRAL] ERROR: $e\n$st');
       _connection?.send(jsonEncode({'type': 'error', 'text': 'Error: $e'}));
-    } finally {
-      try { await session?.dispose(); } catch (_) {}
+    }
+
+    List<Map<String, dynamic>> afterTasks;
+    try {
+      afterTasks = await _getAllTasks();
+      debugPrint('[MISTRAL] afterTasks count=${afterTasks.length}');
+    } catch (e) {
+      debugPrint('[MISTRAL] afterTasks error: $e');
+      afterTasks = [];
+    }
+
+    _sendTaskDiff(beforeTasks, afterTasks);
+    debugPrint('[MISTRAL] task diff sent');
+  }
+
+  Future<void> _handleListTasks() async {
+    try {
+      final tasks = await _getAllTasks();
+      _connection?.send(jsonEncode({'type': 'tasks', 'data': tasks}));
+    } catch (e) {
+      debugPrint('[RTC] list_tasks error: $e');
     }
   }
 
-  Future<void> _handleGroq(String text, String key) async {
-    debugPrint('[GROQ] chat=$text');
-    try {
-      final provider = Provider.auto(apiKey: key, model: 'llama-3.3-70b-versatile');
-      final agent = Agent(provider: provider, tools: []);
-      final response = await agent.run(text);
-      _connection?.send(jsonEncode({'type': 'token', 'text': response}));
-      _connection?.send(jsonEncode({'type': 'done'}));
-    } catch (e, st) {
-      debugPrint('[GROQ] error: $e\n$st');
-      _connection?.send(jsonEncode({'type': 'error', 'text': 'Error: $e'}));
+  Future<List<Map<String, dynamic>>> _getAllTasks() async {
+    final result = await databaseService.read('tasks', {}, many: true);
+    final tasks = (result as List).cast<Map<String, dynamic>>();
+    for (final task in tasks) {
+      final taskId = task['id'] as String;
+      final criteria = await databaseService.read('criteria', {'task_id': taskId}, many: true) as List;
+      task['criteria'] = criteria;
+      debugPrint('[TASKS] task $taskId has ${criteria.length} criteria');
     }
+    return tasks;
+  }
+
+  void _sendTaskDiff(List<Map<String, dynamic>> before, List<Map<String, dynamic>> after) {
+    final beforeIds = before.map((t) => t['id'] as String).toSet();
+    final afterIds = after.map((t) => t['id'] as String).toSet();
+    final beforeMap = {for (final t in before) t['id'] as String: t};
+
+    for (final task in after) {
+      final id = task['id'] as String;
+      if (!beforeIds.contains(id)) {
+        _connection?.send(jsonEncode({'type': 'task_added', 'data': task}));
+      } else {
+        final old = beforeMap[id];
+        if (old != null && _mapsDiffer(old, task)) {
+          _connection?.send(jsonEncode({'type': 'task_updated', 'data': task}));
+        }
+      }
+    }
+
+    for (final task in before) {
+      if (!afterIds.contains(task['id'] as String)) {
+        _connection?.send(jsonEncode({'type': 'task_removed', 'data': {'id': task['id']}}));
+      }
+    }
+  }
+
+  bool _mapsDiffer(Map<String, dynamic> a, Map<String, dynamic> b) {
+    if (a.length != b.length) return true;
+    for (final key in a.keys) {
+      if (a[key] != b[key]) return true;
+    }
+    return false;
   }
 
   Future<void> sendMessage(Map<String, dynamic> data) async {

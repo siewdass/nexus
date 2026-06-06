@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/rtc_client.dart';
 import '../services/theme_service.dart';
-import '../widgets/app_icon.dart';
 import 'scan_screen.dart';
 import 'home.dart';
 
@@ -17,10 +16,8 @@ class LoadingScreen extends StatefulWidget {
 
 class _LoadingScreenState extends State<LoadingScreen> {
   bool _checking = true;
-  bool _connecting = false;
   bool _hasUuid = false;
   String _message = '';
-
   StreamSubscription<String>? _errSub;
 
   @override
@@ -38,8 +35,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
       setState(() {
         _checking = false;
         _hasUuid = true;
-        _connecting = true;
-        _message = 'Conectando al Hub...';
+        _message = 'Buscando Hub...';
       });
       _connect(uuid);
     } else {
@@ -55,19 +51,18 @@ class _LoadingScreenState extends State<LoadingScreen> {
     _errSub = rtcClient.errors.listen((e) {
       if (mounted) {
         setState(() {
-          _connecting = false;
           _message = 'Error: $e';
         });
       }
     });
 
+    rtcClient.addListener(_onRtcChange);
+
     try {
       await rtcClient.connect(uuid);
-      rtcClient.addListener(_onRtcChange);
     } catch (e) {
       if (mounted) {
         setState(() {
-          _connecting = false;
           _message = 'Error al conectar: $e';
         });
       }
@@ -75,12 +70,24 @@ class _LoadingScreenState extends State<LoadingScreen> {
   }
 
   void _onRtcChange() {
-    if (rtcClient.isConnected && mounted) {
+    if (!mounted) return;
+    if (rtcClient.isConnected) {
       rtcClient.removeListener(_onRtcChange);
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const Home()),
       );
+    } else {
+      setState(() {
+        switch (rtcClient.status) {
+          case LinkPeerStatus.finding:
+            _message = 'Buscando Hub...';
+          case LinkPeerStatus.connecting:
+            _message = 'Conectando al Hub...';
+          default:
+            break;
+        }
+      });
     }
   }
 
@@ -97,8 +104,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
 
     setState(() {
       _hasUuid = true;
-      _connecting = true;
-      _message = 'Conectando al Hub...';
+      _message = 'Buscando Hub...';
     });
     _connect(uuid);
   }
@@ -108,8 +114,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
     final uuid = prefs.getString('hub_uuid');
     if (uuid != null && uuid.isNotEmpty && mounted) {
       setState(() {
-        _connecting = true;
-        _message = 'Conectando al Hub...';
+        _message = 'Buscando Hub...';
       });
       _connect(uuid);
     } else {
@@ -127,13 +132,18 @@ class _LoadingScreenState extends State<LoadingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeService>();
+    final connecting = _hasUuid && !rtcClient.isConnected;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBg,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AppIcon(size: 80),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset('assets/logo.png', width: 80, height: 80),
+            ),
             const SizedBox(height: 24),
             Text(
               'Nexus Link',
@@ -146,7 +156,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
             const SizedBox(height: 40),
             if (_checking)
               CircularProgressIndicator(color: theme.primaryText),
-            if (_connecting) ...[
+            if (connecting) ...[
               CircularProgressIndicator(color: theme.primaryText),
               const SizedBox(height: 16),
               Text(
@@ -175,7 +185,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
                 ),
               ),
             ],
-            if (!_connecting && _hasUuid && _message.contains('Error')) ...[
+            if (_message.startsWith('Error') && !connecting) ...[
               const SizedBox(height: 16),
               Text(
                 _message,

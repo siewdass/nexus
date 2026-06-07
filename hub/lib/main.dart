@@ -46,7 +46,7 @@ void main() async {
   await databaseService.open(path: '$homeDir/.nexus_hub', filename: 'nexus.db');
 
   await windowManager.ensureInitialized();
-  await windowManager.setSize(const Size(540, 400));
+  await windowManager.setSize(const Size(540, 360));
   await windowManager.setTitle('Nexus Hub');
   await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
 

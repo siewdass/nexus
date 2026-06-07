@@ -7,10 +7,10 @@ extension Notification.Name {
 
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
-    setContentSize(NSSize(width: 540, height: 400))
+    setContentSize(NSSize(width: 540, height: 360))
 
     let flutterViewController = FlutterViewController()
-    let windowFrame = NSRect(origin: frame.origin, size: NSSize(width: 540, height: 400))
+    let windowFrame = NSRect(origin: frame.origin, size: NSSize(width: 540, height: 360))
     setFrame(windowFrame, display: false)
     self.contentViewController = flutterViewController
     setFrame(windowFrame, display: true)

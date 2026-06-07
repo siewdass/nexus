@@ -4,7 +4,6 @@ import 'package:window_manager/window_manager.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
 import '../services/theme_service.dart';
-import '../services/state.dart';
 import '../services/rtc_service.dart';
 import '../widgets/system_stats.dart';
 import 'settings.dart';
@@ -15,7 +14,6 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeService>();
-    final state = context.watch<StateService>();
     final rtc = context.watch<PeerRTCService>();
     return Scaffold(
       backgroundColor: theme.scaffoldBg,
@@ -62,7 +60,7 @@ class HomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Expanded(
-                          child: _statusColumn(theme, state),
+                          child: _statusColumn(theme),
                         ),
                         const SizedBox(width: 12),
                         if (rtc.isInitialized && rtc.uuid.isNotEmpty)
@@ -81,94 +79,75 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _statusColumn(ThemeService theme, StateService state) {
+  Widget _statusColumn(ThemeService theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _agentRow(theme, state),
+        _agentRow(theme),
       ],
     );
   }
 
-  Widget _agentRow(ThemeService theme, StateService state) {
-    // final cfg = llmService.modelConfig;
-    // final modelName = cfg?.name ?? 'Loading...';
-    // final quant = cfg?.quantization;
-    // final ctx = cfg?.contextSize;
-    // final size = cfg?.fileSize;
-    // final mem = state.physicalBytes;
+  Widget _agentRow(ThemeService theme) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: theme.inactiveBg,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Column(
-          children: [
-            // Row(
-            //   children: [
-            //     AppIcon(size: 16),
-            //     const SizedBox(width: 8),
-            //     Text('Agent', style: TextStyle(color: theme.primaryText, fontSize: 11, fontWeight: FontWeight.w600)),
-            //   ],
-            // ),
-            // const SizedBox(height: 4),
-            // _infoRow(theme, 'Model:', modelName),
-            // if (quant != null) _infoRow(theme, 'Quantized:', quant),
-            // if (ctx != null) _infoRow(theme, 'Context:', _compact(ctx)),
-            // _infoRow(theme, 'Size:', _formatGB(size ?? 0)),
-            // _infoRow(theme, 'RAM:', _formatGB(mem ?? 0)),
-            Expanded(
-              child: Center(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final gaugeSize = (constraints.biggest.shortestSide - 8).clamp(80.0, 500.0);
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: gaugeSize,
-                          height: gaugeSize,
-                          child: SfRadialGauge(
-                            axes: [
-                              RadialAxis(
-                                minimum: 0, maximum: 100,
-                                showLabels: false, showTicks: false,
-                                startAngle: 270, endAngle: 270,
-                                radiusFactor: 0.88,
-                                axisLineStyle: AxisLineStyle(thickness: 8, color: theme.scaffoldBg),
-                                pointers: [RangePointer(value: 88, width: 8, cornerStyle: CornerStyle.bothCurve, enableAnimation: true, color: theme.primaryText)],
-                              ),
-                              RadialAxis(
-                                minimum: 0, maximum: 100,
-                                showLabels: false, showTicks: false,
-                                startAngle: 270, endAngle: 270,
-                                radiusFactor: 0.66,
-                                axisLineStyle: AxisLineStyle(thickness: 8, color: theme.scaffoldBg),
-                                pointers: [RangePointer(value: 42, width: 8, cornerStyle: CornerStyle.bothCurve, enableAnimation: true, color: theme.primaryText)],
-                              ),
-                              RadialAxis(
-                                minimum: 0, maximum: 100,
-                                showLabels: false, showTicks: false,
-                                startAngle: 270, endAngle: 270,
-                                radiusFactor: 0.44,
-                                axisLineStyle: AxisLineStyle(thickness: 8, color: theme.scaffoldBg),
-                                pointers: [RangePointer(value: 67, width: 8, cornerStyle: CornerStyle.bothCurve, enableAnimation: true, color: theme.primaryText)],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text('Groq - Mistral - Google',
-                            style: TextStyle(color: theme.primaryText, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ],
-                    );
-                  },
+        child: _radialGauge(theme),
+      ),
+    );
+  }
+
+  Widget _radialGauge(ThemeService theme) {
+    return Expanded(
+      child: Center(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = (constraints.biggest.shortestSide - 16).clamp(80.0, 400.0);
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: size,
+                  height: size,
+                  child: SfRadialGauge(
+                    axes: [
+                      RadialAxis(
+                        minimum: 0, maximum: 100,
+                        showLabels: false, showTicks: false,
+                        startAngle: 270, endAngle: 270,
+                        radiusFactor: 0.88,
+                        axisLineStyle: AxisLineStyle(thickness: 8, color: theme.scaffoldBg),
+                        pointers: [RangePointer(value: 88, width: 8, cornerStyle: CornerStyle.bothCurve, enableAnimation: true, color: theme.primaryText)],
+                      ),
+                      RadialAxis(
+                        minimum: 0, maximum: 100,
+                        showLabels: false, showTicks: false,
+                        startAngle: 270, endAngle: 270,
+                        radiusFactor: 0.66,
+                        axisLineStyle: AxisLineStyle(thickness: 8, color: theme.scaffoldBg),
+                        pointers: [RangePointer(value: 42, width: 8, cornerStyle: CornerStyle.bothCurve, enableAnimation: true, color: theme.primaryText)],
+                      ),
+                      RadialAxis(
+                        minimum: 0, maximum: 100,
+                        showLabels: false, showTicks: false,
+                        startAngle: 270, endAngle: 270,
+                        radiusFactor: 0.44,
+                        axisLineStyle: AxisLineStyle(thickness: 8, color: theme.scaffoldBg),
+                        pointers: [RangePointer(value: 67, width: 8, cornerStyle: CornerStyle.bothCurve, enableAnimation: true, color: theme.primaryText)],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-          ],
+                const SizedBox(height: 6),
+                Text('Groq - Mistral - Google',
+                    style: TextStyle(color: theme.primaryText, fontSize: 10, fontWeight: FontWeight.bold)),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -176,25 +155,25 @@ class HomeScreen extends StatelessWidget {
 
   Widget _qrCard(ThemeService theme, PeerRTCService rtc) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: theme.inactiveBg,
         borderRadius: BorderRadius.circular(8),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final qrSize = (constraints.biggest.shortestSide - 32).clamp(80.0, 500.0);
+          final size = (constraints.biggest.shortestSide - 16).clamp(80.0, 400.0);
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               QrImageView(
                 data: rtc.uuid,
                 version: QrVersions.auto,
-                size: qrSize,
+                size: size,
                 eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: theme.primaryText),
                 dataModuleStyle: QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: theme.primaryText),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _linkStatusRow(theme, rtc),
             ],
           );
